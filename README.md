@@ -30,6 +30,14 @@ The exploration notebook, `notebooks/01_exploration.ipynb`, shows what the files
 jupyter lab notebooks/01_exploration.ipynb
 ```
 
+## Preparing the data
+
+```powershell
+python -m pipeline.prepare
+```
+
+This adds the target (remaining useful life, capped at 125 cycles), splits the 100 training engines into train, validation and calibration sets (70 / 15 / 15 engines, never splitting an engine), scales the sensors with statistics learnt on the training engines only, and writes `data/processed/*.parquet`, `models/scaler.joblib` and `reports/prepare.json`.
+
 ## Checks
 
 ```powershell
