@@ -1,0 +1,27 @@
+# local notes and planning (not part of the project)
+.instructions/
+CLAUDE.md
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# data and models (until dvc takes over)
+data/
+models/
+
+# experiment tracking
+mlflow.db
+mlartifacts/
+mlruns/
+
+# runtime logs
+monitoring/
+
+# editors
+.vscode/
+.idea/
