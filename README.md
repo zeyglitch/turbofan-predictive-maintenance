@@ -1,5 +1,7 @@
 # turbofan-predictive-maintenance
 
+[![ci](https://github.com/zeyglitch/turbofan-predictive-maintenance/actions/workflows/ci.yml/badge.svg)](https://github.com/zeyglitch/turbofan-predictive-maintenance/actions/workflows/ci.yml)
+
 Predicting how many flight cycles a turbofan engine has left before failure, using NASA's simulated C-MAPSS data.
 
 ## Installation
