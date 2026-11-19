@@ -49,7 +49,21 @@ python -m pipeline.featurize
 python -m pipeline.train_classic
 ```
 
-`featurize` adds, for each sensor, its mean and standard deviation over the last 30 cycles of the same engine, and writes `data/features/*.parquet`. `train_classic` trains a constant baseline and a Ridge regression, prints their scores on the validation engines and writes `reports/metrics/val_classic.json`.
+`featurize` adds, for each sensor, its mean and standard deviation over the last 30 cycles of the same engine, and writes `data/features/*.parquet`. `train_classic` trains the models, prints their scores on the validation engines and writes `reports/metrics/val_classic.json`.
+
+## Experiment tracking
+
+`train_classic` trains four models (constant baseline, Ridge, random forest, XGBoost) and records each run in MLflow: settings, validation scores, a predicted-against-true plot and the model itself. Everything stays on this machine (`mlflow.db` and `mlartifacts/`). To browse the runs:
+
+```powershell
+mlflow ui --backend-store-uri sqlite:///mlflow.db
+```
+
+then open http://127.0.0.1:5000 and choose "Model training". A small grid of XGBoost settings, outside the main chain, is run with:
+
+```powershell
+python -m pipeline.grid
+```
 
 ## Checks
 

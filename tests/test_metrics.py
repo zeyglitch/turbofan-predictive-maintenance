@@ -4,7 +4,14 @@ import pytest
 from turbofan.config import load_params
 from turbofan.data import load_test_rul
 from turbofan.labels import clip_rul
-from turbofan.metrics import alert_metrics, mae, nasa_score, regression_report, rmse
+from turbofan.metrics import (
+    alert_metrics,
+    evaluate_predictions,
+    mae,
+    nasa_score,
+    regression_report,
+    rmse,
+)
 
 # three engines, errors d = pred - true = [-13, +10, 0]
 Y_TRUE = [100, 50, 20]
@@ -43,6 +50,14 @@ def test_perfect_prediction_scores_zero():
         "mae": 0.0,
         "nasa_score": 0.0,
     }
+
+
+def test_evaluate_predictions_bounds_predictions_first():
+    # -10 is brought back to 0 and 200 to 125 before measuring
+    report = evaluate_predictions([0, 125], [-10, 200], cap=125, threshold=30)
+
+    assert report["rmse"] == 0.0
+    assert report["tp"] == 1 and report["tn"] == 1
 
 
 def test_alert_metrics_by_hand():

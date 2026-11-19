@@ -34,6 +34,13 @@ def regression_report(y_true, y_pred) -> dict:
     }
 
 
+def evaluate_predictions(y_true, y_pred, cap: int, threshold: float) -> dict:
+    """Bound predictions to [0, cap], then return the error measures and the alert measures."""
+    # the target never leaves [0, cap]; a linear model can, for instance predict -142 cycles
+    y_pred = np.clip(y_pred, 0, cap)
+    return regression_report(y_true, y_pred) | alert_metrics(y_true, y_pred, threshold)
+
+
 def alert_metrics(y_true, y_pred, threshold: float) -> dict:
     """Treat "rul <= threshold" as an alert and count good and bad alerts.
 
