@@ -8,3 +8,4 @@ matplotlib==3.11.2
 xgboost-cpu==3.4.1
 mlflow==3.18.0
 dvc==3.67.1
+torch==2.15.0

@@ -16,6 +16,8 @@ pip install -r requirements-dev.txt
 
 On Linux or macOS, create the environment with `python3.13 -m venv .venv` and activate it with `source .venv/bin/activate`.
 
+PyTorch is installed in its processor-only version, which is enough here. On Windows that is the version pip finds by default. On Linux, add `--extra-index-url https://download.pytorch.org/whl/cpu` to the `pip install` command to get the 200 MB processor build instead of the 514 MB default one. For a graphics card, install torch first with the command given on pytorch.org.
+
 On Windows, keep the project folder close to the drive root (for example `C:\Projects\...`): JupyterLab installs files with very long paths, and pip fails with a long path error if the folder path is longer than about 100 characters.
 
 ## Data
