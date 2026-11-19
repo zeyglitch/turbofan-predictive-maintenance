@@ -1,0 +1,71 @@
+stages:
+  download:
+    cmd: python -m pipeline.download
+    deps:
+      - pipeline/download.py
+      - turbofan/data.py
+    params:
+      - data.url
+      - data.inner_sha256
+    outs:
+      - data/raw
+
+  prepare:
+    cmd: python -m pipeline.prepare
+    deps:
+      - pipeline/prepare.py
+      - turbofan/config.py
+      - turbofan/data.py
+      - turbofan/labels.py
+      - turbofan/preprocessing.py
+      - data/raw
+    params:
+      - data.subset
+      - prepare
+      - split
+    outs:
+      - data/processed
+      - models/scaler.joblib
+    metrics:
+      - reports/prepare.json:
+          cache: false
+
+  featurize:
+    cmd: python -m pipeline.featurize
+    deps:
+      - pipeline/featurize.py
+      - turbofan/config.py
+      - turbofan/features.py
+      - data/processed
+    params:
+      - prepare.sensors
+      - features
+    outs:
+      - data/features
+
+  train_classic:
+    cmd: python -m pipeline.train_classic
+    deps:
+      - pipeline/train_classic.py
+      - turbofan/config.py
+      - turbofan/features.py
+      - turbofan/classic_models.py
+      - turbofan/metrics.py
+      - data/features
+    params:
+      - data.subset
+      - prepare
+      - split.seed
+      - features
+      - alert
+      - ridge
+      - random_forest
+      - xgboost
+    outs:
+      - models/baseline.json
+      - models/ridge.joblib
+      - models/random_forest.joblib
+      - models/xgboost.json
+    metrics:
+      - reports/metrics/val_classic.json:
+          cache: false

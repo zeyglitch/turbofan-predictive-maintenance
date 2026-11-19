@@ -92,7 +92,10 @@ def main() -> None:
     booster.save_model(MODELS_DIR / "xgboost.json")
     metrics_dir = REPORTS_DIR / "metrics"
     metrics_dir.mkdir(parents=True, exist_ok=True)
-    (metrics_dir / "val_classic.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    # newline="\n": the same bytes on Windows and Linux, so the fingerprint in dvc.lock matches
+    (metrics_dir / "val_classic.json").write_text(
+        json.dumps(results, indent=2), encoding="utf-8", newline="\n"
+    )
     print(f"wrote 4 models to {MODELS_DIR} and {metrics_dir / 'val_classic.json'}")
 
 

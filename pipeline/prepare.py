@@ -48,7 +48,10 @@ def main() -> None:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(scaler, MODELS_DIR / "scaler.joblib")
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    (REPORTS_DIR / "prepare.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    # newline="\n": the same bytes on Windows and Linux, so the fingerprint in dvc.lock matches
+    (REPORTS_DIR / "prepare.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8", newline="\n"
+    )
     print(f"wrote {MODELS_DIR / 'scaler.joblib'} and {REPORTS_DIR / 'prepare.json'}")
 
 

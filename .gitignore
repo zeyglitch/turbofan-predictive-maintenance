@@ -10,10 +10,6 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
-# data and models (until dvc takes over)
-data/
-models/
-
 # experiment tracking
 mlflow.db
 mlartifacts/

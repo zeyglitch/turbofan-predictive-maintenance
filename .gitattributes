@@ -1,0 +1,3 @@
+# keep LF line endings in every working copy, Windows included: dvc.lock records the
+# fingerprint of each source file, and CRLF conversion would change it on checkout
+* text=auto eol=lf

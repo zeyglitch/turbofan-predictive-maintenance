@@ -65,6 +65,27 @@ then open http://127.0.0.1:5000 and choose "Model training". A small grid of XGB
 python -m pipeline.grid
 ```
 
+## Reproducible pipeline
+
+The chain `download → prepare → featurize → train_classic` is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
+
+```powershell
+dvc repro
+```
+
+DVC reruns only the stages whose code, parameters (`params.yaml`) or input data changed, and records what was used in `dvc.lock`. Useful commands:
+
+```powershell
+dvc dag             # the graph of stages
+dvc status          # what is out of date, and why
+dvc metrics show    # scores in reports/
+dvc metrics diff    # scores compared with the last commit
+dvc push            # copy data and models to the DVC remote
+dvc pull            # get them back on another machine or after a clean
+```
+
+Data and models are not stored in git: DVC keeps them in `.dvc/cache` and in a local remote, `../.dvc-storage/turbofan` (a folder next to the project).
+
 ## Checks
 
 ```powershell

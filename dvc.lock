@@ -1,0 +1,225 @@
+schema: '2.0'
+stages:
+  download:
+    cmd: python -m pipeline.download
+    deps:
+    - path: pipeline/download.py
+      hash: md5
+      md5: fca66538d0db2c3f86149fa2e8707934
+      size: 1181
+    - path: turbofan/data.py
+      hash: md5
+      md5: 9fed690c28027d1121193f2c26ecf67c
+      size: 3141
+    params:
+      params.yaml:
+        data.inner_sha256: 
+          74bef434a34db25c7bf72e668ea4cd52afe5f2cf8e44367c55a82bfd91a5a34f
+        data.url: 
+          https://phm-datasets.s3.amazonaws.com/NASA/6.+Turbofan+Engine+Degradation+Simulation+Data+Set.zip
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: a48742bfe9d2c50ba7f486440adf9c10.dir
+      size: 44915748
+      nfiles: 13
+  prepare:
+    cmd: python -m pipeline.prepare
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: a48742bfe9d2c50ba7f486440adf9c10.dir
+      size: 44915748
+      nfiles: 13
+    - path: pipeline/prepare.py
+      hash: md5
+      md5: 0fbe84ec7dec8780d1af95b93236d306
+      size: 2381
+    - path: turbofan/config.py
+      hash: md5
+      md5: da0955c3eaeafed6e3628ca38b4fafc7
+      size: 832
+    - path: turbofan/data.py
+      hash: md5
+      md5: 9fed690c28027d1121193f2c26ecf67c
+      size: 3141
+    - path: turbofan/labels.py
+      hash: md5
+      md5: f89a4023631f2e15dfb99b11070d923f
+      size: 1323
+    - path: turbofan/preprocessing.py
+      hash: md5
+      md5: dabb3052076422a3503b313733ff4d9a
+      size: 1488
+    params:
+      params.yaml:
+        data.subset: FD001
+        prepare:
+          rul_cap: 125
+          sensors:
+          - s_2
+          - s_3
+          - s_4
+          - s_7
+          - s_8
+          - s_9
+          - s_11
+          - s_12
+          - s_13
+          - s_14
+          - s_15
+          - s_17
+          - s_20
+          - s_21
+        split:
+          seed: 42
+          n_val: 15
+          n_calib: 15
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 8adac9fe0bc2ad2374946e086d2532ab.dir
+      size: 1188936
+      nfiles: 4
+    - path: models/scaler.joblib
+      hash: md5
+      md5: b324d4d3b08fa2be9ca87b44a391c7bd
+      size: 1255
+    - path: reports/prepare.json
+      hash: md5
+      md5: 9ba908748a2b4d4e1d8a95525cb49abd
+      size: 2987
+  featurize:
+    cmd: python -m pipeline.featurize
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 8adac9fe0bc2ad2374946e086d2532ab.dir
+      size: 1188936
+      nfiles: 4
+    - path: pipeline/featurize.py
+      hash: md5
+      md5: de56494ce1f139bde1ae92d347dbd673
+      size: 833
+    - path: turbofan/config.py
+      hash: md5
+      md5: da0955c3eaeafed6e3628ca38b4fafc7
+      size: 832
+    - path: turbofan/features.py
+      hash: md5
+      md5: 7f096cde5d89564a0af1ef1892457462
+      size: 1589
+    params:
+      params.yaml:
+        features:
+          rolling_window: 30
+        prepare.sensors:
+        - s_2
+        - s_3
+        - s_4
+        - s_7
+        - s_8
+        - s_9
+        - s_11
+        - s_12
+        - s_13
+        - s_14
+        - s_15
+        - s_17
+        - s_20
+        - s_21
+    outs:
+    - path: data/features
+      hash: md5
+      md5: 5c1ef2baf108d5231ad5d2521d3c26ae.dir
+      size: 9316932
+      nfiles: 4
+  train_classic:
+    cmd: python -m pipeline.train_classic
+    deps:
+    - path: data/features
+      hash: md5
+      md5: 5c1ef2baf108d5231ad5d2521d3c26ae.dir
+      size: 9316932
+      nfiles: 4
+    - path: pipeline/train_classic.py
+      hash: md5
+      md5: e0edf8a24cf1198051c86cf92556f6b7
+      size: 4540
+    - path: turbofan/classic_models.py
+      hash: md5
+      md5: 87853970b3e9a6815e757ac842e1c1f8
+      size: 1812
+    - path: turbofan/config.py
+      hash: md5
+      md5: da0955c3eaeafed6e3628ca38b4fafc7
+      size: 832
+    - path: turbofan/features.py
+      hash: md5
+      md5: 7f096cde5d89564a0af1ef1892457462
+      size: 1589
+    - path: turbofan/metrics.py
+      hash: md5
+      md5: b5352092b3b0a7f1a4c41e457a70504e
+      size: 2496
+    params:
+      params.yaml:
+        alert:
+          threshold: 30
+        data.subset: FD001
+        features:
+          rolling_window: 30
+        prepare:
+          rul_cap: 125
+          sensors:
+          - s_2
+          - s_3
+          - s_4
+          - s_7
+          - s_8
+          - s_9
+          - s_11
+          - s_12
+          - s_13
+          - s_14
+          - s_15
+          - s_17
+          - s_20
+          - s_21
+        random_forest:
+          n_estimators: 200
+          max_depth: 12
+          min_samples_leaf: 5
+          random_state: 42
+        ridge:
+          alpha: 1.0
+        split.seed: 42
+        xgboost:
+          n_estimators: 400
+          learning_rate: 0.03
+          max_depth: 3
+          subsample: 0.8
+          colsample_bytree: 0.8
+          early_stopping_rounds: 30
+          random_state: 42
+    outs:
+    - path: models/baseline.json
+      hash: md5
+      md5: 7530a0e7545876a3f98488f343b4a021
+      size: 27
+    - path: models/random_forest.joblib
+      hash: md5
+      md5: 8125f9858282b620fd0152522fdf52d9
+      size: 20311921
+    - path: models/ridge.joblib
+      hash: md5
+      md5: 0a09b3f1acf21008beba3bf47fbf2dad
+      size: 1545
+    - path: models/xgboost.json
+      hash: md5
+      md5: e5775b302c8a7a809dffe5987a50c14a
+      size: 478514
+    - path: reports/metrics/val_classic.json
+      hash: md5
+      md5: 02190c07c3bb34e9c48f62057b714550
+      size: 1403
