@@ -11,3 +11,12 @@ split:
   seed: 42
   n_val: 15
   n_calib: 15
+
+features:
+  rolling_window: 30
+
+ridge:
+  alpha: 1.0
+
+alert:
+  threshold: 30
