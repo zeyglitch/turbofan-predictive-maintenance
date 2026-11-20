@@ -4,3 +4,5 @@
 /random_forest.joblib
 /xgboost.json
 /lstm.pt
+/cnn.pt
+/champion

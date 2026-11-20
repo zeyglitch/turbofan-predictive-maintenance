@@ -1,4 +1,4 @@
-"""Train the LSTM on windows of consecutive cycles, track every epoch in MLflow, save it."""
+"""Train the LSTM and the CNN on windows of consecutive cycles, track every epoch, save them."""
 
 import json
 
@@ -8,15 +8,26 @@ import torch
 
 from turbofan.config import MODELS_DIR, PROCESSED_DIR, REPORTS_DIR, load_params
 from turbofan.metrics import evaluate_predictions, rmse
-from turbofan.networks import LSTMRegressor
+from turbofan.networks import build_network
 from turbofan.plots import plot_predictions
 from turbofan.tracking import log_figure, log_metrics, log_model, start_run
 from turbofan.training import predict_network, set_seed, train_network
 from turbofan.windows import make_windows
 
+NETWORKS = ["lstm", "cnn"]
 
-def train_lstm(params: dict, train, val, length: int, lstm_params: dict, run_name: str, tags=None):
-    """Train one LSTM on windows of `length` cycles and record the run in MLflow.
+
+def fit_network(
+    params: dict,
+    train,
+    val,
+    model_type: str,
+    model_params: dict,
+    length: int,
+    run_name: str,
+    tags=None,
+):
+    """Train one LSTM or CNN on windows of `length` cycles and record the run in MLflow.
 
     Returns the model (with the weights of its best epoch), its validation metrics and the
     history of the epochs. Also used by grid.py, with other window lengths and sizes.
@@ -30,7 +41,7 @@ def train_lstm(params: dict, train, val, length: int, lstm_params: dict, run_nam
     print(f"{run_name}: {len(X_train)} training windows, {len(X_val)} validation windows")
 
     settings = (
-        lstm_params
+        model_params
         | params["training"]
         | {
             "subset": params["data"]["subset"],
@@ -41,7 +52,7 @@ def train_lstm(params: dict, train, val, length: int, lstm_params: dict, run_nam
     )
     # same seed, same initial weights and same order of batches: the run can be repeated
     set_seed(params["training"]["seed"])
-    model = LSTMRegressor(n_sensors=len(sensors), **lstm_params)
+    model = build_network(model_type, len(sensors), model_params)
 
     def on_epoch(row: dict) -> None:
         # step=epoch: MLflow draws one point per epoch, which gives the learning curve.
@@ -79,29 +90,31 @@ def main() -> None:
     params = load_params()
     train = pd.read_parquet(PROCESSED_DIR / "train.parquet")
     val = pd.read_parquet(PROCESSED_DIR / "val.parquet")
-
-    model, metrics, history = train_lstm(
-        params, train, val, params["windows"]["length"], params["lstm"], "lstm"
-    )
-    print(
-        f"lstm: best epoch {metrics['best_epoch']} of {metrics['epochs_run']}, "
-        f"train rmse {metrics['train_rmse']:.2f}, val rmse {metrics['rmse']:.2f}, "
-        f"val mae {metrics['mae']:.2f}, recall {metrics['recall']:.2f}"
-    )
-
+    length = params["windows"]["length"]
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    # only the weights: the architecture is rebuilt from params.yaml when the model is loaded
-    torch.save(model.cpu().state_dict(), MODELS_DIR / "lstm.pt")
+
+    results, curves = {}, []
+    for name in NETWORKS:
+        model, metrics, history = fit_network(params, train, val, name, params[name], length, name)
+        print(
+            f"{name}: best epoch {metrics['best_epoch']} of {metrics['epochs_run']}, "
+            f"train rmse {metrics['train_rmse']:.2f}, val rmse {metrics['rmse']:.2f}, "
+            f"val mae {metrics['mae']:.2f}, recall {metrics['recall']:.2f}"
+        )
+        # only the weights: the architecture is rebuilt from params.yaml when the model is loaded
+        torch.save(model.cpu().state_dict(), MODELS_DIR / f"{name}.pt")
+        results[name] = metrics
+        curves.append(pd.DataFrame(history).assign(model=name))
+
     metrics_dir = REPORTS_DIR / "metrics"
     metrics_dir.mkdir(parents=True, exist_ok=True)  # creates reports/ as well
-    # one row per epoch; lineterminator="\n" for the same reason as newline="\n" below
-    curves = pd.DataFrame(history).assign(model="lstm")
-    curves.to_csv(REPORTS_DIR / "training_curves.csv", index=False, lineterminator="\n")
+    # one row per epoch and network; lineterminator="\n" for the same reason as newline="\n"
+    pd.concat(curves).to_csv(REPORTS_DIR / "training_curves.csv", index=False, lineterminator="\n")
     # newline="\n": the same bytes on Windows and Linux, so the fingerprint in dvc.lock matches
     (metrics_dir / "val_deep.json").write_text(
-        json.dumps({"lstm": metrics}, indent=2), encoding="utf-8", newline="\n"
+        json.dumps(results, indent=2), encoding="utf-8", newline="\n"
     )
-    print(f"wrote {MODELS_DIR / 'lstm.pt'}, training_curves.csv and val_deep.json")
+    print(f"wrote lstm.pt and cnn.pt to {MODELS_DIR}, training_curves.csv and val_deep.json")
 
 
 if __name__ == "__main__":

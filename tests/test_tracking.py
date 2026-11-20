@@ -1,5 +1,7 @@
 import mlflow
+import numpy as np
 import torch
+from sklearn.linear_model import Ridge
 
 from turbofan import tracking
 from turbofan.networks import LSTMRegressor
@@ -8,6 +10,7 @@ from turbofan.tracking import (
     git_state,
     log_metrics,
     log_model,
+    register_champion,
     start_run,
     tracking_uri,
 )
@@ -46,6 +49,21 @@ def test_logged_lstm_reloads_and_predicts_the_same_on_any_batch_size(tmp_path, m
     with torch.no_grad():
         # 7 windows although the example had 5: the saved graph must not fix the batch size
         assert torch.allclose(reloaded(X), model(X))
+
+
+def test_champion_alias_points_at_the_new_registered_version(tmp_path, monkeypatch):
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    monkeypatch.setattr(tracking, "ROOT", tmp_path)
+    X, y = np.random.default_rng(0).normal(size=(20, 3)), np.arange(20.0)
+    versions = []
+    for alpha in (1.0, 10.0):  # two registrations: the alias must move to the second one
+        with start_run("unit-test", {"alpha": alpha}) as run:
+            log_model(Ridge(alpha=alpha).fit(X, y), "sklearn", input_example=X[:2])
+        versions.append(register_champion(run.info.run_id, "toy-model", "champion"))
+
+    assert versions == ["1", "2"]
+    champion = mlflow.MlflowClient().get_model_version_by_alias("toy-model", "champion")
+    assert str(champion.version) == "2"  # MLflow 3.18 gives the version as an integer here
 
 
 def test_git_state_is_unknown_without_git(monkeypatch):

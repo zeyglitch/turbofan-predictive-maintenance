@@ -1,0 +1,14 @@
+{
+  "champion": "lstm",
+  "val_rmse": {
+    "lstm": 11.092489045191773,
+    "xgboost": 17.025997104806986,
+    "random_forest": 17.823122556426803,
+    "ridge": 20.405458449373622,
+    "cnn": 22.646526159751335
+  },
+  "test_rmse": 14.845247366294455,
+  "conformal_q": 27.918113708496094,
+  "test_coverage": 0.91,
+  "registry_version": "5"
+}

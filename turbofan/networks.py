@@ -25,3 +25,37 @@ class LSTMRegressor(nn.Module):
         outputs, _ = self.lstm(x)  # (batch, time, hidden_size): one output per time step
         last = outputs[:, -1, :]  # (batch, hidden_size): the summary after the last cycle
         return self.head(last).squeeze(-1)  # (batch, 1) -> (batch,)
+
+
+class CNNRegressor(nn.Module):
+    """1D convolutions along time, an average over time, then a linear layer."""
+
+    def __init__(self, n_sensors: int, channels: list[int], kernel_size: int):
+        super().__init__()
+        layers = []
+        in_channels = n_sensors
+        for out_channels in channels:
+            # padding keeps the length: a kernel of 5 sees 2 cycles on each side
+            layers.append(
+                nn.Conv1d(in_channels, out_channels, kernel_size, padding=kernel_size // 2)
+            )
+            layers.append(nn.ReLU())
+            in_channels = out_channels
+        self.convolutions = nn.Sequential(*layers)
+        self.head = nn.Linear(in_channels, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """(batch, time, sensors) -> (batch,)"""
+        x = x.transpose(1, 2)  # Conv1d expects (batch, channels, time): the sensors are channels
+        x = self.convolutions(x)  # (batch, channels[-1], time)
+        x = x.mean(dim=2)  # (batch, channels[-1]): the average of each filter over the window
+        return self.head(x).squeeze(-1)  # (batch, 1) -> (batch,)
+
+
+def build_network(model_type: str, n_sensors: int, model_params: dict) -> nn.Module:
+    """Create an untrained LSTM or CNN from its section of params.yaml."""
+    if model_type == "lstm":
+        return LSTMRegressor(n_sensors=n_sensors, **model_params)
+    if model_type == "cnn":
+        return CNNRegressor(n_sensors=n_sensors, **model_params)
+    raise ValueError(f"unknown network {model_type}, expected lstm or cnn")

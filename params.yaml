@@ -50,3 +50,10 @@ training:
   learning_rate: 0.001
   max_epochs: 60
   patience: 8
+
+cnn:
+  channels: [32, 64, 64]
+  kernel_size: 5
+
+conformal:
+  coverage: 0.90

@@ -75,9 +75,22 @@ python -m pipeline.train_deep
 
 `train_deep` cuts each engine into windows of 50 consecutive cycles and trains an LSTM (PyTorch) on them, with early stopping on the validation engines. Every epoch is recorded in MLflow, which draws the learning curves. It writes `models/lstm.pt`, `reports/training_curves.csv` and `reports/metrics/val_deep.json`. On a laptop processor, training takes about three minutes. A small grid (hidden size, then window length) is run with `python -m pipeline.grid lstm`.
 
+`train_deep` also trains a 1D convolutional network (CNN) on the same windows.
+
+## Evaluation and champion model
+
+```powershell
+python -m pipeline.evaluate
+python -m pipeline.register
+```
+
+`evaluate` scores the six models on the 100 test engines (the last cycle of each engine, compared with `RUL_FD001.txt`). It also builds a 90 % prediction interval for each model from its errors on the calibration engines (split conformal prediction), then measures how often the true value falls inside it. It writes `reports/metrics/test.json` and `reports/predictions_test.parquet`. The test set is used only here, never to choose or tune a model.
+
+`register` picks the model with the lowest validation RMSE, registers it in MLflow as `turbofan-rul` with the alias `champion`, and writes `models/champion/`: the model, the scaler and `metadata.json`. This folder is everything needed to predict, without MLflow.
+
 ## Reproducible pipeline
 
-The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
+The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
 
 ```powershell
 dvc repro

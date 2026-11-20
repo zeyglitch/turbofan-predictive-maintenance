@@ -89,10 +89,84 @@ stages:
       - alert
       - windows
       - lstm
+      - cnn
       - training
     outs:
       - models/lstm.pt
+      - models/cnn.pt
       - reports/training_curves.csv
     metrics:
       - reports/metrics/val_deep.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m pipeline.evaluate
+    deps:
+      - pipeline/evaluate.py
+      - turbofan/config.py
+      - turbofan/classic_models.py
+      - turbofan/conformal.py
+      - turbofan/features.py
+      - turbofan/metrics.py
+      - turbofan/networks.py
+      - turbofan/training.py
+      - turbofan/windows.py
+      - data/features
+      - data/processed
+      - models/baseline.json
+      - models/ridge.joblib
+      - models/random_forest.joblib
+      - models/xgboost.json
+      - models/lstm.pt
+      - models/cnn.pt
+    params:
+      - prepare
+      - windows
+      - lstm
+      - cnn
+      - alert
+      - conformal
+    outs:
+      - reports/predictions_test.parquet
+    metrics:
+      - reports/metrics/test.json:
+          cache: false
+
+  register:
+    cmd: python -m pipeline.register
+    deps:
+      - pipeline/register.py
+      - pipeline/evaluate.py
+      - turbofan/bundle.py
+      - turbofan/networks.py
+      - turbofan/windows.py
+      - models/scaler.joblib
+      - models/ridge.joblib
+      - models/random_forest.joblib
+      - models/xgboost.json
+      - models/lstm.pt
+      - models/cnn.pt
+      - data/features/val.parquet
+      - data/processed/val.parquet
+      - reports/metrics/val_classic.json
+      - reports/metrics/val_deep.json
+      - reports/metrics/test.json
+    params:
+      - data.subset
+      - prepare
+      - features.rolling_window
+      - windows
+      - alert
+      - ridge
+      - random_forest
+      - xgboost
+      - lstm
+      - cnn
+    outs:
+      # persist: DVC never restores this stage from its run cache, so that the registry alias
+      # set by the script always matches the bundle on disk
+      - models/champion:
+          persist: true
+    metrics:
+      - reports/champion.json:
           cache: false

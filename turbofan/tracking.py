@@ -16,6 +16,9 @@ EXPERIMENT_NAME = "turbofan-rul"
 # MLflow saves scikit-learn models with skops, which refuses unknown types when loading them back.
 # Tree is the node storage of our own random forest: we create these files, so we trust it.
 TRUSTED_SKLEARN_TYPES = ["sklearn.tree._tree.Tree"]
+# the packages a saved model needs: our pinned list, instead of letting MLflow guess them by
+# reloading the model in a separate process, which takes about 12 seconds per model
+REQUIREMENTS = str(ROOT / "requirements.txt")
 
 
 def tracking_uri() -> str:
@@ -82,11 +85,32 @@ def log_model(model, flavour: str, input_example) -> None:
             model,
             name="model",
             input_example=input_example,
+            pip_requirements=REQUIREMENTS,
             skops_trusted_types=TRUSTED_SKLEARN_TYPES,
         )
     elif flavour == "xgboost":
-        mlflow.xgboost.log_model(model, name="model", input_example=input_example)
+        mlflow.xgboost.log_model(
+            model, name="model", input_example=input_example, pip_requirements=REQUIREMENTS
+        )
     elif flavour == "pytorch":
-        mlflow.pytorch.log_model(model, name="model", input_example=input_example)
+        mlflow.pytorch.log_model(
+            model, name="model", input_example=input_example, pip_requirements=REQUIREMENTS
+        )
     else:
         raise ValueError(f"unknown model flavour {flavour}, expected sklearn, xgboost or pytorch")
+
+
+def register_champion(run_id: str, model_name: str, alias: str) -> str:
+    """Register the model attached to run_id, point alias at this version, return the version."""
+    use_experiment()
+    experiment_id = mlflow.get_experiment_by_name(EXPERIMENT_NAME).experiment_id
+    # since MLflow 3 a logged model is its own object, found through the run that created it
+    logged = mlflow.search_logged_models(
+        experiment_ids=[experiment_id],
+        filter_string=f"source_run_id = '{run_id}'",
+        output_format="list",
+    )
+    version = mlflow.register_model(logged[0].model_uri, model_name).version
+    # an alias is a movable label: models:/turbofan-rul@champion always means this version
+    mlflow.MlflowClient().set_registered_model_alias(model_name, alias, version)
+    return str(version)

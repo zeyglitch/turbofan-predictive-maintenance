@@ -9,7 +9,7 @@ import itertools
 
 import pandas as pd
 
-from pipeline.train_deep import train_lstm
+from pipeline.train_deep import fit_network
 from turbofan.classic_models import predict, train_xgboost
 from turbofan.config import FEATURES_DIR, PROCESSED_DIR, load_params
 from turbofan.features import feature_columns
@@ -61,11 +61,12 @@ def grid_lstm(params: dict) -> pd.DataFrame:
     train = pd.read_parquet(PROCESSED_DIR / "train.parquet")
     val = pd.read_parquet(PROCESSED_DIR / "val.parquet")
     default_length = params["windows"]["length"]
+    tags = {"grid": "lstm"}
 
     def try_one(hidden_size: int, length: int) -> dict:
         lstm_params = params["lstm"] | {"hidden_size": hidden_size}
         name = f"lstm_hidden{hidden_size}_window{length}"
-        _, metrics, _ = train_lstm(params, train, val, length, lstm_params, name, {"grid": "lstm"})
+        _, metrics, _ = fit_network(params, train, val, "lstm", lstm_params, length, name, tags)
         return {
             "hidden_size": hidden_size,
             "window_length": length,
