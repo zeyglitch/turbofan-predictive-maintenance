@@ -51,6 +51,7 @@ stages:
       - turbofan/features.py
       - turbofan/classic_models.py
       - turbofan/metrics.py
+      - turbofan/plots.py
       - data/features
     params:
       - data.subset
@@ -68,4 +69,30 @@ stages:
       - models/xgboost.json
     metrics:
       - reports/metrics/val_classic.json:
+          cache: false
+
+  train_deep:
+    cmd: python -m pipeline.train_deep
+    deps:
+      - pipeline/train_deep.py
+      - turbofan/config.py
+      - turbofan/windows.py
+      - turbofan/networks.py
+      - turbofan/training.py
+      - turbofan/metrics.py
+      - turbofan/plots.py
+      - data/processed
+    params:
+      - data.subset
+      - prepare
+      - split.seed
+      - alert
+      - windows
+      - lstm
+      - training
+    outs:
+      - models/lstm.pt
+      - reports/training_curves.csv
+    metrics:
+      - reports/metrics/val_deep.json:
           cache: false

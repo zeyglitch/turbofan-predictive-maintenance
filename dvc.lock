@@ -144,8 +144,8 @@ stages:
       nfiles: 4
     - path: pipeline/train_classic.py
       hash: md5
-      md5: e0edf8a24cf1198051c86cf92556f6b7
-      size: 4540
+      md5: fa22b9400ede916a18e8e5318a3938b4
+      size: 4158
     - path: turbofan/classic_models.py
       hash: md5
       md5: 87853970b3e9a6815e757ac842e1c1f8
@@ -162,6 +162,10 @@ stages:
       hash: md5
       md5: b5352092b3b0a7f1a4c41e457a70504e
       size: 2496
+    - path: turbofan/plots.py
+      hash: md5
+      md5: 18e5bc2a1ca33016f614be23eacb4e11
+      size: 520
     params:
       params.yaml:
         alert:
@@ -223,3 +227,87 @@ stages:
       hash: md5
       md5: 02190c07c3bb34e9c48f62057b714550
       size: 1403
+  train_deep:
+    cmd: python -m pipeline.train_deep
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 8adac9fe0bc2ad2374946e086d2532ab.dir
+      size: 1188936
+      nfiles: 4
+    - path: pipeline/train_deep.py
+      hash: md5
+      md5: b1818ce24a076a4699de4899051db3b2
+      size: 4756
+    - path: turbofan/config.py
+      hash: md5
+      md5: da0955c3eaeafed6e3628ca38b4fafc7
+      size: 832
+    - path: turbofan/metrics.py
+      hash: md5
+      md5: b5352092b3b0a7f1a4c41e457a70504e
+      size: 2496
+    - path: turbofan/networks.py
+      hash: md5
+      md5: 389be93c41cc279d2485fb868b3fab71
+      size: 1203
+    - path: turbofan/plots.py
+      hash: md5
+      md5: 18e5bc2a1ca33016f614be23eacb4e11
+      size: 520
+    - path: turbofan/training.py
+      hash: md5
+      md5: ccd54a799f3dc3f311c70f68b9b77650
+      size: 3718
+    - path: turbofan/windows.py
+      hash: md5
+      md5: a34f67f9a5928530361e7de0d25c8ad7
+      size: 2656
+    params:
+      params.yaml:
+        alert:
+          threshold: 30
+        data.subset: FD001
+        lstm:
+          hidden_size: 128
+          num_layers: 2
+          dropout: 0.2
+        prepare:
+          rul_cap: 125
+          sensors:
+          - s_2
+          - s_3
+          - s_4
+          - s_7
+          - s_8
+          - s_9
+          - s_11
+          - s_12
+          - s_13
+          - s_14
+          - s_15
+          - s_17
+          - s_20
+          - s_21
+        split.seed: 42
+        training:
+          seed: 42
+          batch_size: 256
+          learning_rate: 0.001
+          max_epochs: 60
+          patience: 8
+        windows:
+          length: 50
+    outs:
+    - path: models/lstm.pt
+      hash: md5
+      md5: f13166f92d5f7c813aa0ffecf1d5a867
+      size: 827221
+    - path: reports/metrics/val_deep.json
+      hash: md5
+      md5: bd525cd03a049a1ee6a0e7e774a8672d
+      size: 327
+    - path: reports/training_curves.csv
+      hash: md5
+      md5: cc34454f0890010f431425d8fd154c19
+      size: 1262

@@ -6,6 +6,7 @@ import subprocess
 from contextlib import contextmanager
 
 import mlflow
+import mlflow.pytorch
 import mlflow.sklearn
 import mlflow.xgboost
 
@@ -85,5 +86,7 @@ def log_model(model, flavour: str, input_example) -> None:
         )
     elif flavour == "xgboost":
         mlflow.xgboost.log_model(model, name="model", input_example=input_example)
+    elif flavour == "pytorch":
+        mlflow.pytorch.log_model(model, name="model", input_example=input_example)
     else:
-        raise ValueError(f"unknown model flavour {flavour}, expected sklearn or xgboost")
+        raise ValueError(f"unknown model flavour {flavour}, expected sklearn, xgboost or pytorch")

@@ -56,6 +56,16 @@ def test_short_engine_is_padded_at_the_start_with_its_first_row():
     assert y[0] == 0
 
 
+def test_every_cycle_gives_one_window_per_row():
+    X, y, _ = make_windows(engine(1, 35), SENSORS, 30, every_cycle=True)
+    assert X.shape == (35, 30, 2)
+    np.testing.assert_array_equal(y, 35 - np.arange(1, 36))  # the rul of cycles 1 to 35
+    np.testing.assert_array_equal(X[0, :, 0], np.full(30, 1001))  # cycle 1, repeated 30 times
+    np.testing.assert_array_equal(X[9, -10:, 0], 1000 + np.arange(1, 11))  # ends on cycle 10
+    np.testing.assert_array_equal(X[9, :20, 0], np.full(20, 1001))
+    np.testing.assert_array_equal(X[-1, :, 0], 1000 + np.arange(6, 36))  # as without padding
+
+
 def test_target_is_nan_without_rul_column():
     _, y, _ = make_windows(engine(1, 35).drop(columns="rul_clipped"), SENSORS, 30)
     assert np.isnan(y).all()

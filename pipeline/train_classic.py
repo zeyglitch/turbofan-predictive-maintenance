@@ -16,18 +16,8 @@ from turbofan.classic_models import (
 from turbofan.config import FEATURES_DIR, MODELS_DIR, REPORTS_DIR, load_params
 from turbofan.features import feature_columns
 from turbofan.metrics import evaluate_predictions, rmse
+from turbofan.plots import plot_predictions
 from turbofan.tracking import log_figure, log_metrics, log_model, start_run
-
-
-def plot_predictions(y_true, y_pred, title: str):
-    """Scatter plot of predicted against true remaining life; a perfect model sits on the line."""
-    fig, ax = plt.subplots(figsize=(5, 5))
-    ax.scatter(y_true, y_pred, s=3, alpha=0.3)
-    ax.plot([0, 125], [0, 125], color="black", linewidth=1)
-    ax.set_xlabel("true rul_clipped")
-    ax.set_ylabel("predicted (bounded to [0, 125])")
-    ax.set_title(title)
-    return fig
 
 
 def main() -> None:
@@ -74,7 +64,7 @@ def main() -> None:
         with start_run(name, common | settings | {"n_inputs": len(columns)}):
             log_metrics({f"val_{key}": value for key, value in metrics.items()})
             log_metrics({"train_rmse": train_rmse})
-            figure = plot_predictions(y_val, val_pred, f"{name}, validation")
+            figure = plot_predictions(y_val, val_pred, f"{name}, validation", cap)
             log_figure(figure, "pred_vs_true_val.png")
             plt.close(figure)
             if flavour is not None:

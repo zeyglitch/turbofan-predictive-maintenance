@@ -14,10 +14,12 @@ def pad_start(values: np.ndarray, length: int) -> np.ndarray:
 
 
 def make_windows(
-    df: pd.DataFrame, sensors: list[str], length: int
+    df: pd.DataFrame, sensors: list[str], length: int, every_cycle: bool = False
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Cut each engine into every window of `length` consecutive cycles.
 
+    With every_cycle=True, one window ends on each cycle, including the first length - 1 ones
+    (padded at the start), so that the windows match the rows of df one to one.
     Returns X of shape (n, length, n_sensors), the rul_clipped of the last cycle of each window
     (NaN when df has no rul_clipped column) and the unit_id of each window.
     """
@@ -25,7 +27,9 @@ def make_windows(
     X_parts, y_parts, unit_parts = [], [], []
     # one engine at a time: a window never contains the end of one engine and the start of the next
     for unit_id, engine in df.groupby("unit_id", sort=True):
-        values = pad_start(engine[sensors].to_numpy(np.float32), length)
+        values = engine[sensors].to_numpy(np.float32)
+        # length - 1 extra rows in front give a full window ending on the very first cycle
+        values = pad_start(values, len(values) + length - 1 if every_cycle else length)
         # (T, sensors) -> (T - length + 1, sensors, length), then swap to (…, length, sensors)
         windows = sliding_window_view(values, length, axis=0).transpose(0, 2, 1)
         n = len(windows)

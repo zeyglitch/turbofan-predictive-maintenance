@@ -35,3 +35,18 @@ xgboost:
   colsample_bytree: 0.8
   early_stopping_rounds: 30
   random_state: 42
+
+windows:
+  length: 50
+
+lstm:
+  hidden_size: 128
+  num_layers: 2
+  dropout: 0.2
+
+training:
+  seed: 42
+  batch_size: 256
+  learning_rate: 0.001
+  max_epochs: 60
+  patience: 8

@@ -64,12 +64,20 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 then open http://127.0.0.1:5000 and choose "Model training". A small grid of XGBoost settings, outside the main chain, is run with:
 
 ```powershell
-python -m pipeline.grid
+python -m pipeline.grid xgboost
 ```
+
+## Neural network
+
+```powershell
+python -m pipeline.train_deep
+```
+
+`train_deep` cuts each engine into windows of 50 consecutive cycles and trains an LSTM (PyTorch) on them, with early stopping on the validation engines. Every epoch is recorded in MLflow, which draws the learning curves. It writes `models/lstm.pt`, `reports/training_curves.csv` and `reports/metrics/val_deep.json`. On a laptop processor, training takes about three minutes. A small grid (hidden size, then window length) is run with `python -m pipeline.grid lstm`.
 
 ## Reproducible pipeline
 
-The chain `download → prepare → featurize → train_classic` is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
+The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
 
 ```powershell
 dvc repro
