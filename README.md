@@ -88,9 +88,17 @@ python -m pipeline.register
 
 `register` picks the model with the lowest validation RMSE, registers it in MLflow as `turbofan-rul` with the alias `champion`, and writes `models/champion/`: the model, the scaler and `metadata.json`. This folder is everything needed to predict, without MLflow.
 
+## Explainability
+
+```powershell
+python -m pipeline.explain
+```
+
+`explain` shows which inputs the models rely on, on the validation engines. For XGBoost, it computes SHAP values on 2,000 rows: global importance, a beeswarm plot, and the explanation of one prediction. For the LSTM, it computes permutation importance: how much the validation RMSE rises when one sensor is shuffled between windows. Tables and figures are written to `reports/explain/`, with `sensor_ranking.csv` comparing the two methods sensor by sensor.
+
 ## Reproducible pipeline
 
-The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
+The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register` and `explain`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
 
 ```powershell
 dvc repro

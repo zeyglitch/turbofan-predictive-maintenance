@@ -170,3 +170,27 @@ stages:
     metrics:
       - reports/champion.json:
           cache: false
+
+  explain:
+    cmd: python -m pipeline.explain
+    deps:
+      - pipeline/explain.py
+      - pipeline/evaluate.py
+      - turbofan/explain.py
+      - turbofan/features.py
+      - turbofan/metrics.py
+      - turbofan/networks.py
+      - turbofan/plots.py
+      - turbofan/training.py
+      - turbofan/windows.py
+      - data/features/val.parquet
+      - data/processed/val.parquet
+      - models/xgboost.json
+      - models/lstm.pt
+    params:
+      - prepare
+      - windows
+      - lstm
+      - explain
+    outs:
+      - reports/explain

@@ -164,8 +164,8 @@ stages:
       size: 2496
     - path: turbofan/plots.py
       hash: md5
-      md5: 18e5bc2a1ca33016f614be23eacb4e11
-      size: 520
+      md5: fa04dc9c09c5840ad232bd0b0da458d1
+      size: 864
     params:
       params.yaml:
         alert:
@@ -253,8 +253,8 @@ stages:
       size: 2756
     - path: turbofan/plots.py
       hash: md5
-      md5: 18e5bc2a1ca33016f614be23eacb4e11
-      size: 520
+      md5: fa04dc9c09c5840ad232bd0b0da458d1
+      size: 864
     - path: turbofan/training.py
       hash: md5
       md5: ccd54a799f3dc3f311c70f68b9b77650
@@ -565,3 +565,93 @@ stages:
       hash: md5
       md5: 56cb90c3b55e71e93c598b311c43121f
       size: 340
+  explain:
+    cmd: python -m pipeline.explain
+    deps:
+    - path: data/features/val.parquet
+      hash: md5
+      md5: b25b53f7a908b9f3a510281b2cc64d83
+      size: 869413
+    - path: data/processed/val.parquet
+      hash: md5
+      md5: a7b6e7d46cbf279c9b8b0c0989cf2788
+      size: 160378
+    - path: models/lstm.pt
+      hash: md5
+      md5: f13166f92d5f7c813aa0ffecf1d5a867
+      size: 827221
+    - path: models/xgboost.json
+      hash: md5
+      md5: e5775b302c8a7a809dffe5987a50c14a
+      size: 478514
+    - path: pipeline/evaluate.py
+      hash: md5
+      md5: 0b3d777adc8cd42f051bb550bb21c567
+      size: 4668
+    - path: pipeline/explain.py
+      hash: md5
+      md5: eca9ec8c0a17fe6b50123dcd8976ae67
+      size: 4983
+    - path: turbofan/explain.py
+      hash: md5
+      md5: 9d2ddcb0f0b84864ef484c29d6ebf638
+      size: 2024
+    - path: turbofan/features.py
+      hash: md5
+      md5: 7f096cde5d89564a0af1ef1892457462
+      size: 1589
+    - path: turbofan/metrics.py
+      hash: md5
+      md5: b5352092b3b0a7f1a4c41e457a70504e
+      size: 2496
+    - path: turbofan/networks.py
+      hash: md5
+      md5: 6f306e38737dce49e298539d751d021a
+      size: 2756
+    - path: turbofan/plots.py
+      hash: md5
+      md5: fa04dc9c09c5840ad232bd0b0da458d1
+      size: 864
+    - path: turbofan/training.py
+      hash: md5
+      md5: ccd54a799f3dc3f311c70f68b9b77650
+      size: 3718
+    - path: turbofan/windows.py
+      hash: md5
+      md5: a34f67f9a5928530361e7de0d25c8ad7
+      size: 2656
+    params:
+      params.yaml:
+        explain:
+          sample_size: 2000
+          seed: 42
+          permutation_repeats: 5
+        lstm:
+          hidden_size: 128
+          num_layers: 2
+          dropout: 0.2
+        prepare:
+          rul_cap: 125
+          sensors:
+          - s_2
+          - s_3
+          - s_4
+          - s_7
+          - s_8
+          - s_9
+          - s_11
+          - s_12
+          - s_13
+          - s_14
+          - s_15
+          - s_17
+          - s_20
+          - s_21
+        windows:
+          length: 50
+    outs:
+    - path: reports/explain
+      hash: md5
+      md5: c7a6196cce544e30cccac8db4ff012da.dir
+      size: 736120
+      nfiles: 9
