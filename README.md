@@ -131,12 +131,15 @@ uvicorn api.main:app --port 8000
 python -m streamlit run dashboard/app.py
 ```
 
-then open http://localhost:8501. The dashboard reads the files written by the pipeline (`data/`, `reports/`, `dvc.yaml`) and trains nothing; a page whose files are missing says which command to run. Pages so far:
+then open http://localhost:8501. The dashboard reads the files written by the pipeline (`data/`, `reports/`, `dvc.yaml`) and trains nothing; a page whose files are missing says which command to run. Its pages:
 
 - **Overview**: key figures, the pipeline drawn from `dvc.yaml`, when each stage last wrote its outputs.
 - **Data explorer**: the raw files of FD001 to FD004, lifetimes, which sensors are kept and why, correlations, the 21 sensors of one engine.
 - **Preprocessing**: four before/after views (scaling, capped target, engine split, rolling window).
 - **Models**: the six models' scores, the networks' learning curves, predictions against truth, errors and the alert's confusion matrix.
+- **Engine view**: one test engine replayed cycle by cycle, with the prediction and its interval at each cycle, asked to the API. Start the API first (`uvicorn api.main:app --port 8000`); the page says so if it does not answer. `API_URL` changes the API's address.
+- **Explainability**: SHAP for XGBoost, permutation importance for the LSTM, one prediction explained.
+- **Glossary**: the project's terms, explained simply, with a search box.
 
 `python -m` matters: it puts the project folder on Python's import path, so the pages find `turbofan/` and `dashboard/`.
 

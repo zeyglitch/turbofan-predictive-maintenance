@@ -1,0 +1,118 @@
+# The terms of the project, explained simply: a short English version of the project's glossary.
+# One section per theme; each term has a short meaning. Later phases add their own terms.
+
+The problem:
+  - term: Turbofan
+    meaning: The engine of airliners. A large fan at the front, then compressors, a combustion chamber and turbines.
+  - term: C-MAPSS
+    meaning: NASA's engine simulator. The data of this project comes from it; it is simulated, not measured on real engines.
+  - term: Cycle
+    meaning: One flight. An engine's age is counted in cycles.
+  - term: Remaining useful life (RUL)
+    meaning: The number of cycles left before failure. This is what the models predict.
+  - term: Predictive maintenance
+    meaning: Servicing an engine just before it fails, neither too early (waste) nor too late (breakdown), thanks to a prediction.
+  - term: Run-to-failure
+    meaning: The full history of an engine, from new to failure. Every training engine is followed this way.
+  - term: Constant sensor
+    meaning: A sensor that keeps one value (or two) over the whole file. It says nothing about wear, so it is dropped.
+
+Machine learning:
+  - term: Feature
+    meaning: One input column of a model.
+  - term: Target
+    meaning: What the model must predict; here, the remaining life.
+  - term: Regression
+    meaning: Predicting a number (cycles), as opposed to classification, which predicts a category.
+  - term: Training, validation and test sets
+    meaning: Three parts of the data, to learn, to choose and tune, and to judge once at the end.
+  - term: Data leakage
+    meaning: Information that should not be available slips into training. The score looks good but is wrong.
+  - term: Split by engine
+    meaning: All the rows of an engine go to the same part, so that validation only holds engines the model has never seen.
+  - term: Scaling
+    meaning: Bringing each sensor to mean 0 and standard deviation 1, with statistics learnt on the training engines only.
+  - term: Capped target
+    meaning: Any remaining life above 125 cycles is replaced by 125. Early in life, the sensors cannot tell 300 cycles left from 200.
+  - term: Rolling feature
+    meaning: The mean or spread of a sensor over the last 30 cycles of the same engine, to give the recent trend to a model that sees one row at a time.
+  - term: Baseline
+    meaning: The simplest possible model (always predict the average), used as a point of comparison.
+  - term: RMSE, MAE
+    meaning: Two measures of the typical error, in cycles. RMSE weighs large errors more.
+  - term: NASA score
+    meaning: The error measure of the original challenge. It punishes late predictions (more life predicted than there is) harder than early ones.
+  - term: Confusion matrix
+    meaning: The four outcomes of the alert. Alerts that were right, false alarms, missed alerts, engines rightly left alone.
+  - term: Precision, recall
+    meaning: Of the alerts raised, the share that were right; of the engines that needed an alert, the share that got one.
+  - term: Hyperparameter
+    meaning: A setting chosen before training (tree depth, layer size), as opposed to the parameters the model learns.
+  - term: Overfitting
+    meaning: The model learns the training data by heart and does worse on new data.
+  - term: Random forest
+    meaning: Many decision trees, each trained on a different sample, whose answers are averaged.
+  - term: Boosting, XGBoost
+    meaning: Trees added one after another, each correcting the errors of the previous ones.
+
+Deep learning:
+  - term: Sliding window
+    meaning: A block of 50 consecutive cycles cut from an engine's history; the input of the networks.
+  - term: LSTM
+    meaning: A recurrent network that reads a sequence step by step while keeping a memory.
+  - term: 1D convolution (CNN)
+    meaning: Small filters that slide along time and detect local patterns.
+  - term: Epoch
+    meaning: One full pass over the training data.
+  - term: Batch
+    meaning: A group of examples processed together before one update of the weights.
+  - term: Loss
+    meaning: The number training tries to lower.
+  - term: Learning rate
+    meaning: The size of each step of gradient descent.
+  - term: Dropout
+    meaning: Switching off random neurons during training, to limit overfitting.
+  - term: Early stopping
+    meaning: Stopping training when the validation score has not improved for a while (8 epochs here), and keeping the best weights.
+  - term: Learning curve
+    meaning: Loss and score epoch after epoch.
+  - term: Padding
+    meaning: Making a short history long enough by repeating its first cycle.
+
+Trust in the model:
+  - term: Prediction interval
+    meaning: '"Between 22 and 63 cycles" instead of a single number.'
+  - term: Conformal prediction
+    meaning: A method that builds these intervals from the errors measured on engines kept aside (calibration engines).
+  - term: Coverage
+    meaning: How often the truth falls inside the interval; about 90 % is expected here.
+  - term: Bootstrap
+    meaning: Redrawing the test engines at random, thousands of times, to see how much a score would vary with other engines.
+  - term: Explainability
+    meaning: Knowing which inputs weighed in a prediction.
+  - term: SHAP value
+    meaning: An input's share of a prediction. Base value plus the sum of the SHAP values gives the prediction.
+  - term: Permutation importance
+    meaning: Shuffle one input and measure how much the score gets worse.
+  - term: Beeswarm, waterfall
+    meaning: Two SHAP plots. One dot per row and input; the steps from the base value to one prediction.
+
+MLOps:
+  - term: Pipeline
+    meaning: The chain of automatic steps, from the raw files to the delivered model.
+  - term: DVC
+    meaning: Versions data and models next to git, and reruns only the stages whose inputs changed.
+  - term: Experiment tracking, MLflow
+    meaning: Keeping a record of every training run (settings, scores, files); MLflow is the tool used here.
+  - term: Model registry, champion
+    meaning: The catalogue of a model's versions; the champion is the version in service.
+  - term: Model bundle
+    meaning: The folder holding everything needed to predict. The model, the scaler, the settings.
+  - term: Continuous integration (CI)
+    meaning: Running the checks (lint, tests) automatically on every push.
+  - term: API
+    meaning: A door through which another program asks for a service; here, POST /predict.
+  - term: Training-serving skew
+    meaning: In production, the model receives data prepared differently from training. Avoided here by sharing one function, predict_engine.
+  - term: Dashboard
+    meaning: This application. It reads what the pipeline wrote and asks the API, but computes no model itself.

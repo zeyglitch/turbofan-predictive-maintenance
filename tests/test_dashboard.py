@@ -6,17 +6,28 @@ AppTest runs the app in the test process, without a browser or a server.
 import json
 import shutil
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from dashboard import api_client
 from turbofan.config import COLUMNS, ROOT, load_params
 from turbofan.features import add_rolling_features
 from turbofan.labels import add_rul
 from turbofan.preprocessing import fit_scaler, scale_sensors
 
 APP = str(ROOT / "dashboard" / "app.py")
-PAGES = ["views/overview.py", "views/data_explorer.py", "views/preprocessing.py", "views/models.py"]
+PAGES = [
+    "views/overview.py",
+    "views/data_explorer.py",
+    "views/preprocessing.py",
+    "views/models.py",
+    "views/engine_view.py",
+    "views/explainability.py",
+]
+GLOSSARY = "views/glossary.py"
 MODELS = ["baseline", "ridge", "random_forest", "xgboost", "lstm", "cnn"]
 PARTS = {"train": [1, 2, 3, 4], "val": [5, 6], "calib": [7, 8]}
 
@@ -46,15 +57,19 @@ def scores(rmse: float) -> dict:
 
 @pytest.fixture
 def toy_root(tmp_path, small_fleet):
-    """A project folder holding small versions of every file the four pages read."""
+    """A project folder holding small versions of every file the pages read."""
     shutil.copy(ROOT / "params.yaml", tmp_path / "params.yaml")
     shutil.copy(ROOT / "dvc.yaml", tmp_path / "dvc.yaml")
     params = load_params(tmp_path / "params.yaml")
     sensors = params["prepare"]["sensors"]
 
+    # the synthetic fleet serves as both the training and the test file
     raw_dir = tmp_path / "data" / "raw"
     raw_dir.mkdir(parents=True)
-    small_fleet[COLUMNS].to_csv(raw_dir / "train_FD001.txt", sep=" ", header=False, index=False)
+    for part in ("train", "test"):
+        small_fleet[COLUMNS].to_csv(
+            raw_dir / f"{part}_FD001.txt", sep=" ", header=False, index=False
+        )
 
     fleet = add_rul(small_fleet, params["prepare"]["rul_cap"])
     train = fleet[fleet["unit_id"].isin(PARTS["train"])]
@@ -65,6 +80,7 @@ def toy_root(tmp_path, small_fleet):
     ]:
         (tmp_path / "data" / folder).mkdir(parents=True)
         table.to_parquet(tmp_path / "data" / folder / "train.parquet", index=False)
+    fleet.to_parquet(tmp_path / "data" / "processed" / "test.parquet", index=False)
 
     reports = tmp_path / "reports"
     parts = {name: {"n_engines": len(units), "units": units} for name, units in PARTS.items()}
@@ -93,7 +109,51 @@ def toy_root(tmp_path, small_fleet):
             for epoch in range(1, 7)
         ]
     ).to_csv(reports / "training_curves.csv", index=False)
+
+    explain = reports / "explain"
+    explain.mkdir()
+    inputs = [f"{sensor}_mean" for sensor in sensors]
+    pd.Series(np.linspace(5, 1, len(inputs)), index=inputs, name="mean_abs_shap").to_csv(
+        explain / "xgboost_shap_importance.csv"
+    )
+    pd.Series(np.linspace(9, 1, len(sensors)), index=sensors, name="rmse_increase").to_csv(
+        explain / "lstm_permutation_importance.csv"
+    )
+    ranks = np.arange(1, len(sensors) + 1)
+    pd.DataFrame(
+        {
+            "sensor": sensors,
+            "xgboost_shap": ranks[::-1] * 1.0,
+            "lstm_permutation": ranks[::-1] * 2.0,
+            "xgboost_rank": ranks,
+            "lstm_rank": ranks,
+        }
+    ).to_csv(explain / "sensor_ranking.csv", index=False)
+    write_json(
+        explain / "one_prediction.json",
+        {"unit_id": 5, "cycle": 30, "true_rul": 20, "base_value": 80.0, "prediction": 25.0},
+    )
+    for name in ("xgboost_shap_beeswarm.png", "xgboost_shap_one_prediction.png"):
+        plt.imsave(explain / name, np.zeros((4, 4, 3)))  # a tiny black image
     return tmp_path
+
+
+@pytest.fixture
+def answering_api(monkeypatch):
+    """Replace the two calls to the API by answers made up from the engine's own cycles."""
+
+    def model_info(url):
+        return {"model_type": "lstm", "model_version": "1", "alert_threshold": 30}
+
+    def prediction_curve(url, engine, model_version):
+        cycles = engine["cycle"].sort_values().to_numpy()
+        rul = np.clip(125 - cycles, 0, 125).astype(float)
+        return pd.DataFrame(
+            {"cycle": cycles, "rul": rul, "rul_low": rul - 10, "rul_high": rul + 10}
+        ).assign(alert=lambda df: df["rul"] <= 30)
+
+    monkeypatch.setattr(api_client, "model_info", model_info)
+    monkeypatch.setattr(api_client, "prediction_curve", prediction_curve)
 
 
 def open_page(page: str) -> AppTest:
@@ -110,11 +170,12 @@ def test_page_without_the_pipeline_files_says_what_to_run(page, tmp_path, monkey
 
 
 @pytest.mark.parametrize("page", PAGES)
-def test_page_with_toy_files_draws_without_error(page, toy_root, monkeypatch):
+def test_page_with_toy_files_draws_without_error(page, toy_root, answering_api, monkeypatch):
     monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
     app = open_page(page)
     assert not app.exception
     assert not app.info  # no file reported missing
+    assert not app.error
     assert app.title[0].value
 
 
@@ -132,3 +193,34 @@ def test_models_page_follows_the_chosen_model(toy_root, monkeypatch):
     assert app.segmented_control[0].value == "lstm"  # the champion is shown first
     app.segmented_control[0].set_value("ridge").run()
     assert not app.exception
+
+
+def test_engine_view_says_how_to_start_the_api_when_it_does_not_answer(toy_root, monkeypatch):
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    monkeypatch.setenv("API_URL", "http://127.0.0.1:9")  # nothing listens on port 9
+    app = open_page("views/engine_view.py")
+    assert not app.exception
+    assert "uvicorn api.main:app" in app.error[0].value
+
+
+def test_engine_view_shows_the_prediction_at_the_last_cycle(
+    toy_root, answering_api, small_fleet, monkeypatch
+):
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    metrics = {m.label: m.value for m in open_page("views/engine_view.py").metric}
+    # engine 34 is not among the toy engines, so the first one is shown
+    n_cycles = int((small_fleet["unit_id"] == 1).sum())
+    assert metrics["Cycles seen"] == str(n_cycles)
+    # the made-up API predicts 125 - cycle; the toy engines have 40 to 80 cycles
+    assert metrics["Predicted remaining life"] == f"{125 - n_cycles} cycles"
+    assert metrics["Alert"] == "no"
+
+
+def test_glossary_filters_the_terms(monkeypatch):
+    app = AppTest.from_file(APP, default_timeout=30).run().switch_page(GLOSSARY).run()
+    n_terms = len(app.markdown)
+    app.text_input[0].set_value("leakage").run()
+    assert not app.exception
+    assert 0 < len(app.markdown) < n_terms
+    app.text_input[0].set_value("no such word").run()
+    assert "No term matches" in app.info[0].value

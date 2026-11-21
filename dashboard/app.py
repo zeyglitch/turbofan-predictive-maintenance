@@ -34,6 +34,24 @@ pages = [
         icon=":material/model_training:",
         help="The six models compared on validation and test, errors, learning curves.",
     ),
+    st.Page(
+        "views/engine_view.py",
+        title="Engine view",
+        icon=":material/monitoring:",
+        help="One test engine, its remaining life predicted cycle by cycle by the API.",
+    ),
+    st.Page(
+        "views/explainability.py",
+        title="Explainability",
+        icon=":material/psychology:",
+        help="Which inputs the models rely on: SHAP for XGBoost, permutation for the LSTM.",
+    ),
+    st.Page(
+        "views/glossary.py",
+        title="Glossary",
+        icon=":material/menu_book:",
+        help="The terms of the project, explained simply.",
+    ),
 ]
 
 st.navigation(pages).run()
