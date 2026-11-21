@@ -96,6 +96,35 @@ python -m pipeline.explain
 
 `explain` shows which inputs the models rely on, on the validation engines. For XGBoost, it computes SHAP values on 2,000 rows: global importance, a beeswarm plot, and the explanation of one prediction. For the LSTM, it computes permutation importance: how much the validation RMSE rises when one sensor is shuffled between windows. Tables and figures are written to `reports/explain/`, with `sensor_ranking.csv` comparing the two methods sensor by sensor.
 
+## Prediction API
+
+```powershell
+uvicorn api.main:app --port 8000
+```
+
+The API loads `models/champion/` once, at start-up, and answers on three routes:
+
+| Route | Answer |
+|---|---|
+| `GET /health` | `{"status": "ok", "model_loaded": true}` |
+| `GET /model` | the champion's type, registry version, date, sensors and scores |
+| `POST /predict` | the history of one engine → remaining cycles, 90 % interval, alert |
+
+The interactive documentation is at http://127.0.0.1:8000/docs: each route has a "Try it out" button. Example call from PowerShell, with a two-cycle history:
+
+```powershell
+$cycle = @{setting_1 = -0.0006; setting_2 = 0.0004; setting_3 = 100.0; s_1 = 518.67; s_2 = 642.58; s_3 = 1581.22; s_4 = 1398.91; s_5 = 14.62; s_6 = 21.61; s_7 = 554.42; s_8 = 2388.08; s_9 = 9056.4; s_10 = 1.3; s_11 = 47.23; s_12 = 521.79; s_13 = 2388.06; s_14 = 8130.11; s_15 = 8.4024; s_16 = 0.03; s_17 = 393.0; s_18 = 2388.0; s_19 = 100.0; s_20 = 38.81; s_21 = 23.3552}
+$body = @{unit_id = 1; cycles = @(($cycle + @{cycle = 1}), ($cycle + @{cycle = 2}))} | ConvertTo-Json -Depth 3
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/predict -ContentType application/json -Body $body
+```
+
+A malformed request (empty history, missing sensor, text instead of a number) gets a 422 answer saying which field is wrong. Two environment variables set the files used: `MODEL_DIR`, the bundle folder (`models/champion` by default), and `PREDICTION_LOG`, a file where each prediction is appended as one JSON line. Without `PREDICTION_LOG` nothing is logged; to keep a log, start the API with:
+
+```powershell
+$env:PREDICTION_LOG = "monitoring/predictions.jsonl"
+uvicorn api.main:app --port 8000
+```
+
 ## Reproducible pipeline
 
 The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register` and `explain`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:
