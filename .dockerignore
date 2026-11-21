@@ -1,0 +1,17 @@
+# What docker build never sends to the engine: big folders, local tools, private notes.
+# The images copy their code explicitly; data and models are mounted at run time.
+.venv
+.git
+.dvc/cache
+data
+models
+mlartifacts
+mlflow.db
+monitoring
+reports
+notebooks
+.instructions
+CLAUDE.md
+**/__pycache__
+.pytest_cache
+.ruff_cache

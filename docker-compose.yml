@@ -1,0 +1,62 @@
+# docker compose up --build: the API on port 8000, the dashboard on 8501, MLflow on 5000.
+# Training stays on the machine (dvc repro); the containers only use what it wrote, through
+# mounted folders. Run `dvc repro` (or `dvc pull`) first.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      # every prediction is appended here, for the monitoring of phase 13
+      PREDICTION_LOG: /app/monitoring/predictions.jsonl
+    volumes:
+      - ./models/champion:/app/models/champion:ro
+      - ./monitoring:/app/monitoring
+    healthcheck:
+      # the slim image has no curl: Python asks /health itself
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data:ro
+      - ./reports:/app/reports:ro
+      # only read for the dates of the Overview page: several stages write their outputs there
+      - ./models:/app/models:ro
+      - ./monitoring:/app/monitoring:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.18.0
+    ports:
+      - "5000:5000"
+    environment:
+      # no usage statistics sent to the MLflow developers
+      MLFLOW_DISABLE_TELEMETRY: "true"
+    command: >-
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+    volumes:
+      - ./mlflow.db:/mlflow/mlflow.db
+      # MLflow stored each run's files under the absolute path of the machine that trained,
+      # file:///C:/Projects/turbofan-predictive-maintenance/mlartifacts here. Mounting the
+      # folder at that same path inside the container lets the server find them. On another
+      # machine, set MLFLOW_ARTIFACTS_PATH to its own path, written /C:/... in the same way.
+      - type: bind
+        source: ./mlartifacts
+        target: ${MLFLOW_ARTIFACTS_PATH:-/C:/Projects/turbofan-predictive-maintenance/mlartifacts}
+        read_only: true
+        bind:
+          create_host_path: false

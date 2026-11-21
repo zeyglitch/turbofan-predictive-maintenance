@@ -7,7 +7,7 @@ the tests point it to a folder of small toy files.
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -142,8 +142,11 @@ def stage_status(stages: dict[str, dict]) -> pd.DataFrame:
             {
                 "stage": name,
                 "outputs": ", ".join(stage["outs"]),
+                # in UTC, so that the machine and a container (set to UTC) show the same time
                 "last_written": (
-                    datetime.fromtimestamp(max(map(last_modified, outs))) if done else None
+                    datetime.fromtimestamp(max(map(last_modified, outs)), tz=timezone.utc)
+                    if done
+                    else None
                 ),
             }
         )

@@ -1,0 +1,13 @@
+# Only what the API image needs: no MLflow, no shap, no Streamlit. Same versions as requirements.txt.
+# The PyTorch index gives the processor-only torch (about 200 MB instead of 514 MB).
+--extra-index-url https://download.pytorch.org/whl/cpu
+pandas==3.1.1
+numpy==2.5.5
+scikit-learn==1.9.1
+joblib==1.6.0
+pyyaml==6.0.3
+xgboost-cpu==3.4.1
+torch==2.15.0
+fastapi==0.165.0
+uvicorn==0.54.0
+pydantic==2.14.3

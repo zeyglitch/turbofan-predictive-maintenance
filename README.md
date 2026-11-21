@@ -143,6 +143,24 @@ then open http://localhost:8501. The dashboard reads the files written by the pi
 
 `python -m` matters: it puts the project folder on Python's import path, so the pages find `turbofan/` and `dashboard/`.
 
+## Run with Docker
+
+The API, the dashboard and the MLflow interface can run together in containers, with Docker Desktop started:
+
+```powershell
+docker compose up --build
+```
+
+| Service | Address | Image |
+|---|---|---|
+| `api` | http://localhost:8000/docs | `Dockerfile.api`: FastAPI and processor-only torch (`requirements-api.txt`) |
+| `dashboard` | http://localhost:8501 | `Dockerfile.dashboard`: Streamlit, no torch (`requirements-dashboard.txt`) |
+| `mlflow` | http://localhost:5000 | the official `ghcr.io/mlflow/mlflow:v3.18.0` |
+
+Training stays on the machine: run `dvc repro` (or `dvc pull`) first. The containers use its results through mounted folders: `models/champion` (read-only) for the API, `data/`, `reports/` and `models/` (read-only) for the dashboard, `mlflow.db` and `mlartifacts/` for MLflow. The API appends every prediction to `monitoring/predictions.jsonl`. The dashboard reaches the API by its service name, `http://api:8000`. Stop everything with Ctrl+C, or `docker compose down`.
+
+MLflow recorded each run's files under the absolute path of the machine that trained (`file:///C:/Projects/turbofan-predictive-maintenance/mlartifacts`). The compose file mounts `mlartifacts/` at that same path inside the container. If the project lives elsewhere, set `MLFLOW_ARTIFACTS_PATH` to that path, written the same way (`/D:/work/turbofan-predictive-maintenance/mlartifacts`), before `docker compose up`.
+
 ## Reproducible pipeline
 
 The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register` and `explain`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:

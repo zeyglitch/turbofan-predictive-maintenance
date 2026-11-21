@@ -84,7 +84,7 @@ st.dataframe(
         "stage": "Stage",
         "outputs": "Outputs",
         "last_written": st.column_config.DatetimeColumn(
-            "Outputs last written", format="YYYY-MM-DD HH:mm"
+            "Outputs last written (UTC)", format="YYYY-MM-DD HH:mm"
         ),
     },
 )

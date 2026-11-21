@@ -1,0 +1,25 @@
+# The Streamlit dashboard of phase 11. No torch: it reads files and asks the API for predictions.
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+WORKDIR /app
+
+COPY requirements-dashboard.txt .
+RUN pip install --no-cache-dir -r requirements-dashboard.txt
+
+# params.yaml for the settings, dvc.yaml for the pipeline diagram of the Overview page
+COPY params.yaml dvc.yaml ./
+COPY turbofan/ turbofan/
+COPY dashboard/ dashboard/
+
+RUN useradd --create-home app
+USER app
+
+# data/ and reports/ are mounted by docker-compose.yml; the API is reached by its service name
+ENV API_URL=http://api:8000
+EXPOSE 8501
+# python -m puts /app on the import path, so that the pages find turbofan/ and dashboard/
+CMD ["python", "-m", "streamlit", "run", "dashboard/app.py", \
+     "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true", \
+     "--browser.gatherUsageStats=false"]
