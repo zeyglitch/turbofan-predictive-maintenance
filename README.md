@@ -161,6 +161,35 @@ Training stays on the machine: run `dvc repro` (or `dvc pull`) first. The contai
 
 MLflow recorded each run's files under the absolute path of the machine that trained (`file:///C:/Projects/turbofan-predictive-maintenance/mlartifacts`). The compose file mounts `mlartifacts/` at that same path inside the container. If the project lives elsewhere, set `MLFLOW_ARTIFACTS_PATH` to that path, written the same way (`/D:/work/turbofan-predictive-maintenance/mlartifacts`), before `docker compose up`.
 
+## Simulated production and drift monitoring
+
+Once the model is in service, are the sensors it receives still like the ones it knows? A simulation replays test engines towards the API, cycle by cycle, as if they were flying, then a drift report compares what the API received with a normal period of service.
+
+Start the API with a prediction log (see above, or use `docker compose up`), then, in another terminal:
+
+```powershell
+python -m pipeline.simulate --scenario normal
+python -m pipeline.monitor
+```
+
+| Scenario | Engines replayed | What happens |
+|---|---|---|
+| `normal` | test FD001, engines 51 to 100 | nothing unusual |
+| `sensor_offset` | the same engines | from halfway through the replay, `s_11` and `s_4` drift slowly, up to 1.5 standard deviations |
+| `new_fault_mode` | test FD003, 100 engines | a second fault mode, never seen in training |
+
+`--engines N` replays only the first N engines and `--step N` sends one cycle in N, to go faster. Every prediction is appended to `monitoring/predictions.jsonl` by the API, and the true remaining life of every cycle sent to `monitoring/ground_truth.jsonl`; empty `monitoring/` before switching scenarios.
+
+`monitor` compares each of the 14 sensors with the reference period, test FD001 engines 1 to 50: the Wasserstein distance between the two distributions, in standard deviations of the reference. A sensor drifts when this distance is 0.1 or more. The reference is a period of service and not the training engines: training engines are followed until failure, engines in service are mostly seen before it, so a normal fleet would already look drifted. It writes `reports/monitoring/drift.json` and `drift.png`. Results with the full replay:
+
+| Scenario | Predictions | Drifted sensors | Share |
+|---|---|---|---|
+| `normal` | 6,757 | none (largest distance 0.083) | 0.00 |
+| `sensor_offset` | 6,757 | `s_4` (0.449), `s_11` (0.452) | 0.14 |
+| `new_fault_mode` | 16,596 | 13 of 14, all but `s_14` | 0.93 |
+
+The test is written with scipy rather than Evidently: Evidently 0.7.23 requires plotly < 6 and does not import with pandas 3.1.
+
 ## Reproducible pipeline
 
 The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register` and `explain`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:

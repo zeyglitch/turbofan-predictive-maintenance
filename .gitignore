@@ -15,8 +15,9 @@ mlflow.db
 mlartifacts/
 mlruns/
 
-# runtime logs
+# runtime logs and the reports built from them
 monitoring/
+reports/monitoring/
 
 # editors
 .vscode/

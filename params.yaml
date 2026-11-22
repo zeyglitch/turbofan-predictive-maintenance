@@ -62,3 +62,14 @@ explain:
   sample_size: 2000
   seed: 42
   permutation_repeats: 5
+
+monitoring:
+  # simulated production (phase 13). Test FD001 engines 1 to reference_engines are the normal
+  # period of service the drift is measured against; the simulation replays the others.
+  reference_engines: 50
+  offset_sensors: [s_11, s_4]
+  offset_std: 1.5
+  offset_start: 0.5
+  new_fault_subset: FD003
+  drift_threshold: 0.1
+  drift_share_threshold: 0.3
