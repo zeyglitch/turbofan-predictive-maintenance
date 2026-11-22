@@ -12,6 +12,7 @@ from turbofan.data import load_raw
 from turbofan.features import add_rolling_features, feature_columns
 from turbofan.labels import add_rul
 from turbofan.preprocessing import fit_scaler, scale_sensors
+from turbofan.retraining import champion_replaced
 
 SENSORS = ["s_2", "s_11", "s_3"]
 RESPONSE_KEYS = {"unit_id", "cycle", "rul", "rul_low", "rul_high", "alert", "model_version"}
@@ -139,6 +140,10 @@ def test_no_log_file_without_prediction_log(small_fleet, tmp_path, engine_40_cyc
 @pytest.mark.needs_data
 @pytest.mark.skipif(
     not (CHAMPION_DIR / "metadata.json").exists(), reason="no champion, run dvc repro"
+)
+@pytest.mark.skipif(
+    champion_replaced(),
+    reason="the retraining flow replaced models/champion; dvc checkout models/champion restores it",
 )
 def test_api_gives_the_predictions_of_the_evaluation(monkeypatch):
     monkeypatch.setenv("MODEL_DIR", str(CHAMPION_DIR))

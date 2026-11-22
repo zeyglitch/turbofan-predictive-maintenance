@@ -11,6 +11,7 @@ from turbofan.metrics import rmse
 from turbofan.networks import LSTMRegressor
 from turbofan.predict import predict_engine
 from turbofan.preprocessing import fit_scaler, scale_sensors
+from turbofan.retraining import champion_replaced
 from turbofan.training import set_seed
 
 SENSORS = ["s_2", "s_11", "s_3"]
@@ -70,6 +71,10 @@ def test_ridge_prediction_matches_the_training_preparation(small_fleet):
 @pytest.mark.needs_data
 @pytest.mark.skipif(
     not (CHAMPION_DIR / "metadata.json").exists(), reason="no champion, run dvc repro"
+)
+@pytest.mark.skipif(
+    champion_replaced(),
+    reason="the retraining flow replaced models/champion; dvc checkout models/champion restores it",
 )
 def test_champion_on_raw_test_engines_gives_the_rmse_of_the_evaluation():
     bundle = load_bundle(CHAMPION_DIR)

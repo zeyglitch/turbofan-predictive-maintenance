@@ -58,6 +58,20 @@ with st.container(horizontal=True):
         border=True,
     )
 
+# the retraining flow (phase 14) can replace models/champion without going through DVC
+bundle_file = loaders.path("models", "champion", "metadata.json")
+if bundle_file.exists():
+    served = loaders.read_json(bundle_file)
+    if served["registry_version"] != champion["registry_version"]:
+        st.warning(
+            f"The retraining flow promoted version {served['registry_version']} "
+            f"({served['model_type'].upper()}, trained on {' + '.join(served['subsets'])}): it "
+            "is the model the API serves now. The figures above are those of the pipeline's "
+            "champion. See the Retraining page.",
+            title="The champion was replaced by retraining",
+            icon=":material/autorenew:",
+        )
+
 st.subheader("The pipeline")
 st.caption(
     "Each box is a stage of `dvc.yaml`. An arrow means: this stage writes a file that the next "

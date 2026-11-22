@@ -140,6 +140,7 @@ then open http://localhost:8501. The dashboard reads the files written by the pi
 - **Engine view**: one test engine replayed cycle by cycle, with the prediction and its interval at each cycle, asked to the API. Start the API first (`uvicorn api.main:app --port 8000`); the page says so if it does not answer. `API_URL` changes the API's address.
 - **Explainability**: SHAP for XGBoost, permutation importance for the LSTM, one prediction explained.
 - **Live monitoring**: the predictions logged by the API, data drift sensor by sensor and the real error over time, refreshed every 5 seconds while a simulation runs (see below).
+- **Retraining**: each run of the retraining flow, the champion against the challenger on the test engines, and the decision (see below).
 - **Glossary**: the project's terms, explained simply, with a search box.
 
 `python -m` matters: it puts the project folder on Python's import path, so the pages find `turbofan/` and `dashboard/`.
@@ -203,6 +204,50 @@ This RMSE covers every cycle, not only the last one of each engine, so it is not
 
 The test is written with scipy rather than Evidently: Evidently 0.7.23 requires plotly < 6 and does not import with pandas 3.1.
 
+## Retraining with Prefect
+
+When the drift is high, a flow retrains the model on more data and promotes it only if a written rule says so. After a simulation:
+
+```powershell
+python -m flows.retrain_flow
+```
+
+Prefect runs six tasks in order and records each run:
+
+| Task | What it does |
+|---|---|
+| `check_drift` | the drift report on `monitoring/predictions.jsonl`; below a drift share of 0.3, the flow stops here |
+| `train_challenger` | the same model with the same settings as the champion, trained on FD001 + FD003 (engines of FD003 renumbered 1001 to 1100, each subset split 70/15/15), registered in MLflow with the alias `challenger` |
+| `evaluate_both` | both models on the 200 test engines of FD001 and FD003, through `predict_engine`, the function behind the API |
+| `decide` | promote only if the RMSE on the 200 engines drops by at least 2 % **and** the RMSE on FD001 rises by less than 10 % (`params.yaml`, section `retraining`) |
+| `promote` | the challenger is saved in `models/challenger/`; if promoted, it replaces `models/champion/` and the alias `champion` moves to its version |
+| `write_report` | `reports/retraining/<date>.json`: trigger, drift, scores, decision and reason |
+
+Without a Prefect server, the flow starts a temporary one. Its database stays in `.prefect/` in the project folder, and no usage statistics are sent (`flows/__init__.py`). To browse the runs, start the server in another terminal, then open http://127.0.0.1:4200:
+
+```powershell
+$env:PREFECT_HOME = ".prefect"; $env:PREFECT_SERVER_ANALYTICS_ENABLED = "false"
+prefect server start
+```
+
+Results after a full `new_fault_mode` simulation (drift share 0.93), RMSE at the last cycle of each test engine:
+
+| Model | FD001 (100 engines) | FD003 (100 engines) | All 200 |
+|---|---|---|---|
+| Champion (LSTM v5, trained on FD001) | 14.85 | 46.25 | 34.34 |
+| Challenger (LSTM v6, trained on FD001 + FD003) | 14.67 | 13.23 | 13.97 |
+
+The challenger was promoted: 59.3 % better on the 200 engines, 1.2 % better on FD001. Replaying the simulations with it, the RMSE on every cycle went from 22.80 to 10.40 on `new_fault_mode` and from 14.94 to 12.19 on `normal`. A second run of the flow trained an identical challenger (same data, same seed): improvement 0.0 %, champion kept.
+
+Here the test engines decide the promotion, which keeps the demonstration simple; a real project would keep a separate set of engines for this decision. The drift reference stays the FD001 period: after a promotion, the FD003 engines still look drifted.
+
+The flow replaces `models/champion/` without DVC, so `dvc status` then reports it as modified, and two tests that compare the served model with the pipeline's evaluation are skipped. To go back to the pipeline's champion:
+
+```powershell
+dvc checkout models/champion --force
+```
+
+and move the alias back in MLflow (`MlflowClient().set_registered_model_alias("turbofan-rul", "champion", "5")`). The API loads the champion at start-up: restart it after a promotion.
 ## Reproducible pipeline
 
 The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register` and `explain`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:

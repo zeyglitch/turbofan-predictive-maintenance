@@ -138,3 +138,18 @@ Monitoring:
     meaning: The real answer. For a remaining life, it is only known after the failure, long after the prediction.
   - term: Rolling RMSE
     meaning: The RMSE of the last predictions only (2,000 here, about 15 engines), recomputed as new ones arrive, to see the error change over time.
+Retraining:
+  - term: Champion
+    meaning: The model in service, the one the API answers with. Here the LSTM, registered in MLflow with the alias champion.
+  - term: Challenger
+    meaning: A new model trained to replace the champion. Here the same LSTM, trained on FD001 + FD003. It must prove it is better first.
+  - term: Promotion rule
+    meaning: The written rule that decides if the challenger replaces the champion. Here, RMSE on all test engines 2 % lower or more, and RMSE on FD001 less than 10 % higher.
+  - term: Orchestrator
+    meaning: A tool that runs the steps of a job in order, records each run and retries a step that fails. Here, Prefect.
+  - term: Flow and task
+    meaning: In Prefect, a flow is the whole job (retrain_flow) and a task one of its steps (check_drift, train_challenger...).
+  - term: Retry
+    meaning: Running a failed task again after a short wait. check_drift is retried twice, in case the log is still being written.
+  - term: Alias (MLflow)
+    meaning: A movable label on a registered version. Promoting a challenger moves the champion alias to its version.

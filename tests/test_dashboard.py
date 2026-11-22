@@ -27,8 +27,10 @@ PAGES = [
     "views/engine_view.py",
     "views/explainability.py",
     "views/live_monitoring.py",
+    "views/retraining.py",
 ]
 LIVE = "views/live_monitoring.py"
+RETRAINING = "views/retraining.py"
 GLOSSARY = "views/glossary.py"
 MODELS = ["baseline", "ridge", "random_forest", "xgboost", "lstm", "cnn"]
 PARTS = {"train": [1, 2, 3, 4], "val": [5, 6], "calib": [7, 8]}
@@ -139,7 +141,45 @@ def toy_root(tmp_path, small_fleet):
         plt.imsave(explain / name, np.zeros((4, 4, 3)))  # a tiny black image
 
     write_simulation(tmp_path, small_fleet, s_11_shift=0.0)
+    write_retraining_reports(tmp_path)
     return tmp_path
+
+
+def write_retraining_reports(root) -> None:
+    """Two runs of the retraining flow: one without drift, then one that promoted a challenger."""
+    no_drift = {
+        "started_at": "2026-11-22T10:00:00+00:00",
+        "champion_version": "5",
+        "drift_share": 0.07,
+        "drifted_sensors": ["s_9"],
+        "n_logged": 1374,
+        "decision": {
+            "retrain": False,
+            "promote": False,
+            "improvement": None,
+            "fd001_change": None,
+            "reason": "drift share 0.07 below 0.3: no retraining",
+        },
+    }
+    promoted = no_drift | {
+        "started_at": "2026-11-22T11:00:00+00:00",
+        "drift_share": 0.93,
+        "n_logged": 16596,
+        "challenger_version": "6",
+        "scores": {
+            "champion": {"FD001": 15.0, "FD003": 40.0, "all": 30.0},
+            "challenger": {"FD001": 15.5, "FD003": 24.0, "all": 20.0},
+        },
+        "decision": {
+            "retrain": True,
+            "promote": True,
+            "improvement": 1 / 3,
+            "fd001_change": 0.5 / 15,
+            "reason": "RMSE on all test engines improved by 33.3% and FD001 changed by +3.3%",
+        },
+    }
+    write_json(root / "reports" / "retraining" / "2026-11-22T100000Z.json", no_drift)
+    write_json(root / "reports" / "retraining" / "2026-11-22T110000Z.json", promoted)
 
 
 def write_simulation(root, fleet: pd.DataFrame, s_11_shift: float) -> None:
@@ -274,3 +314,35 @@ def test_live_monitoring_puts_the_shifted_sensor_first(toy_root, small_fleet, mo
     assert metrics["RMSE, last 100 predictions"] == "10.0 cycles"
     assert app.selectbox[0].value == "s_11"  # sensors sorted by distance
     assert not app.warning  # one sensor of 14 is below the retraining share
+
+
+def test_retraining_shows_the_latest_run_and_every_run(toy_root, monkeypatch):
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    app = open_page(RETRAINING)
+    metrics = {m.label: m.value for m in app.metric}
+    assert metrics["Drift share"] == "0.93"
+    assert metrics["Challenger"] == "v6"
+    assert metrics["Decision"] == "challenger promoted"
+    assert "improved by 33.3%" in app.success[0].value
+    history = app.dataframe[-1].value
+    assert len(history) == 2
+    assert history.iloc[0]["started_at"].startswith("2026-11-22T11")  # the latest first
+
+
+def test_retraining_after_a_run_without_drift(toy_root, monkeypatch):
+    (toy_root / "reports" / "retraining" / "2026-11-22T110000Z.json").unlink()
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    app = open_page(RETRAINING)
+    metrics = {m.label: m.value for m in app.metric}
+    assert metrics["Challenger"] == "not trained"
+    assert metrics["Decision"] == "no retraining"
+    assert not app.exception
+
+
+def test_overview_warns_when_retraining_replaced_the_champion(toy_root, monkeypatch):
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    assert not open_page(PAGES[0]).warning  # no bundle in the toy folder: nothing to say
+    served = {"registry_version": "2", "model_type": "lstm", "subsets": ["FD001", "FD003"]}
+    write_json(toy_root / "models" / "champion" / "metadata.json", served)
+    warning = open_page(PAGES[0]).warning[0].value
+    assert "promoted version 2 (LSTM, trained on FD001 + FD003)" in warning

@@ -1,0 +1,47 @@
+import pytest
+
+from turbofan.config import load_params
+from turbofan.retraining import decide
+
+SETTINGS = {"drift_share_threshold": 0.3, "min_improvement": 0.02, "max_degradation": 0.10}
+CHAMPION = {"all": 30.0, "FD001": 15.0, "FD003": 40.0}
+
+
+def test_a_better_challenger_is_promoted():
+    challenger = {"all": 20.0, "FD001": 15.5, "FD003": 24.0}
+    decision = decide(0.93, CHAMPION, challenger, SETTINGS)
+    assert decision["retrain"] and decision["promote"]
+    assert decision["improvement"] == pytest.approx(1 / 3)
+    assert decision["fd001_change"] == pytest.approx(0.5 / 15)
+
+
+def test_a_challenger_not_better_enough_is_not_promoted():
+    challenger = {"all": 29.7, "FD001": 15.0, "FD003": 39.0}  # 1 % better, 2 % required
+    decision = decide(0.93, CHAMPION, challenger, SETTINGS)
+    assert decision["retrain"] and not decision["promote"]
+    assert "less than the 2% required" in decision["reason"]
+
+
+def test_a_challenger_worse_on_fd001_is_not_promoted_even_if_better_overall():
+    challenger = {"all": 20.0, "FD001": 16.5, "FD003": 23.0}  # FD001 10 % worse: not allowed
+    decision = decide(0.93, CHAMPION, challenger, SETTINGS)
+    assert not decision["promote"]
+    assert "FD001 worse by 10.0%" in decision["reason"]
+
+
+def test_without_drift_nothing_is_trained():
+    decision = decide(0.14, None, None, SETTINGS)  # no scores: nothing was trained
+    assert decision == {
+        "retrain": False,
+        "promote": False,
+        "improvement": None,
+        "fd001_change": None,
+        "reason": "drift share 0.14 below 0.3: no retraining",
+    }
+
+
+def test_the_rule_uses_the_thresholds_of_params():
+    settings = load_params()["retraining"] | load_params()["monitoring"]
+    assert settings["min_improvement"] == 0.02
+    assert settings["max_degradation"] == 0.10
+    assert settings["drift_share_threshold"] == 0.3

@@ -53,6 +53,12 @@ pages = [
         help="The model in service: what the API receives, data drift and the real error.",
     ),
     st.Page(
+        "views/retraining.py",
+        title="Retraining",
+        icon=":material/autorenew:",
+        help="Each run of the retraining flow: trigger, champion against challenger, decision.",
+    ),
+    st.Page(
         "views/glossary.py",
         title="Glossary",
         icon=":material/menu_book:",

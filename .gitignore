@@ -19,6 +19,12 @@ mlruns/
 monitoring/
 reports/monitoring/
 
+# retraining flow (phase 14): its data, its challenger, its reports and Prefect's database
+data/challenger/
+models/challenger/
+reports/retraining/
+.prefect/
+
 # editors
 .vscode/
 .idea/

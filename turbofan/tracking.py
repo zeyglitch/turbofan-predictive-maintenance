@@ -100,6 +100,17 @@ def log_model(model, flavour: str, input_example) -> None:
         raise ValueError(f"unknown model flavour {flavour}, expected sklearn, xgboost or pytorch")
 
 
+def last_run_id() -> str:
+    """The id of the run that was closed last in this process (to register its model)."""
+    return mlflow.last_active_run().info.run_id
+
+
+def set_alias(model_name: str, alias: str, version: str) -> None:
+    """Point alias at an existing version: promoting a challenger only moves the champion label."""
+    use_experiment()
+    mlflow.MlflowClient().set_registered_model_alias(model_name, alias, version)
+
+
 def register_champion(run_id: str, model_name: str, alias: str) -> str:
     """Register the model attached to run_id, point alias at this version, return the version."""
     use_experiment()

@@ -74,3 +74,9 @@ monitoring:
   drift_threshold: 0.1
   drift_share_threshold: 0.3
   error_window: 2000  # predictions in the rolling RMSE, about 15 engines
+
+retraining:
+  # phase 14: the challenger is trained on FD001 + extra_subset, then compared on both test sets
+  extra_subset: FD003
+  min_improvement: 0.02  # RMSE on all test engines lowered by at least 2 %
+  max_degradation: 0.10  # RMSE on FD001 raised by less than 10 %
