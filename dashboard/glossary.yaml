@@ -116,3 +116,25 @@ MLOps:
     meaning: In production, the model receives data prepared differently from training. Avoided here by sharing one function, predict_engine.
   - term: Dashboard
     meaning: This application. It reads what the pipeline wrote and asks the API, but computes no model itself.
+
+Monitoring:
+  - term: Simulated production
+    meaning: Test engines replayed towards the API cycle by cycle, each time with their whole history, as if they were flying.
+  - term: Data drift
+    meaning: The data received in service no longer looks like the data the model knows. Here, a sensor that slowly shifts.
+  - term: Concept drift
+    meaning: The link between the inputs and the answer changes. Here, a second fault mode never seen in training.
+  - term: Reference period
+    meaning: The normal data the service is compared with. Here, test engines 1 to 50 of FD001, not the training engines.
+  - term: Wasserstein distance
+    meaning: The least work needed to turn one histogram into the other. Divided here by the reference standard deviation; from 0.1, a sensor drifts.
+  - term: Kolmogorov-Smirnov test
+    meaning: Compares two distributions through the largest gap between their cumulative curves. With thousands of rows, its p-value flags even tiny differences.
+  - term: Drift share
+    meaning: The share of sensors that drift. From 0.3, retraining is suggested.
+  - term: Fleet age trap
+    meaning: Sensors follow wear, so a fleet in service, seen mostly before failure, looks drifted next to engines followed until failure.
+  - term: Ground truth
+    meaning: The real answer. For a remaining life, it is only known after the failure, long after the prediction.
+  - term: Rolling RMSE
+    meaning: The RMSE of the last predictions only (2,000 here, about 15 engines), recomputed as new ones arrive, to see the error change over time.

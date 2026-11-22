@@ -1,4 +1,5 @@
-"""Data drift report: the sensors logged by the API against a normal period of service.
+"""Monitoring report: the sensors logged by the API against a normal period of service, and the
+real error of the predictions when the simulation has written the truth.
 
 Run it after a simulation: python -m pipeline.monitor
 It writes reports/monitoring/drift.json and drift.png.
@@ -12,20 +13,22 @@ import pandas as pd
 
 from turbofan.config import REPORTS_DIR, load_params
 from turbofan.data import load_raw
-from turbofan.monitoring import MONITORING_DIR, build_drift_report, load_prediction_log
+from turbofan.metrics import rmse
+from turbofan.monitoring import (
+    MONITORING_DIR,
+    build_drift_report,
+    error_over_time,
+    join_ground_truth,
+    load_prediction_log,
+    reference_period,
+)
 
 OUTPUT_DIR = REPORTS_DIR / "monitoring"
 
 
 def load_reference(settings: dict) -> pd.DataFrame:
-    """The reference period: every cycle of test FD001 engines 1 to reference_engines.
-
-    Not the training engines: those are followed until failure, while engines in service are
-    seen at every stage of their life, mostly before the end. Compared with full lives, a normal
-    fleet already looks drifted (see the phase 13 notes).
-    """
-    test = load_raw("FD001", "test")
-    return test[test["unit_id"] <= settings["reference_engines"]]
+    """The reference period: every cycle of test FD001 engines 1 to reference_engines."""
+    return reference_period(load_raw("FD001", "test"), settings["reference_engines"])
 
 
 def plot_sensor_distributions(reference: pd.DataFrame, current: pd.DataFrame, report: dict):
@@ -49,6 +52,21 @@ def plot_sensor_distributions(reference: pd.DataFrame, current: pd.DataFrame, re
     return fig
 
 
+def error_summary(log: pd.DataFrame, truth: pd.DataFrame, cap: int, settings: dict) -> dict:
+    """RMSE of the predictions whose truth is known: overall, per half, and on the last window."""
+    errors = error_over_time(join_ground_truth(log, truth), cap, settings["error_window"])
+    first, second = errors.iloc[: len(errors) // 2], errors.iloc[len(errors) // 2 :]
+    last_window = errors["rolling_rmse"].iloc[-1]
+    return {
+        "n_with_truth": len(errors),
+        "rmse": rmse(errors["rul_true_clipped"], errors["rul"]),
+        "rmse_first_half": rmse(first["rul_true_clipped"], first["rul"]),
+        "rmse_second_half": rmse(second["rul_true_clipped"], second["rul"]),
+        # empty while fewer than error_window predictions have a truth
+        "last_window_rmse": None if pd.isna(last_window) else round(float(last_window), 2),
+    }
+
+
 def main() -> None:
     params = load_params()
     settings = params["monitoring"]
@@ -69,6 +87,11 @@ def main() -> None:
         "retraining_suggested": report["drift_share"] >= settings["drift_share_threshold"],
         **report,
     }
+    truth_path = MONITORING_DIR / "ground_truth.jsonl"
+    if truth_path.exists() and truth_path.stat().st_size > 0:
+        report["error"] = error_summary(
+            current, load_prediction_log(truth_path), params["prepare"]["rul_cap"], settings
+        )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUTPUT_DIR / "drift.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -83,6 +106,14 @@ def main() -> None:
         f"{len(sensors)} sensors: {report['drifted_sensors']}); retraining suggested: "
         f"{report['retraining_suggested']}"
     )
+    if "error" in report:
+        error = report["error"]
+        print(
+            f"real error on {error['n_with_truth']} predictions: RMSE {error['rmse']:.2f} "
+            f"(first half {error['rmse_first_half']:.2f}, second half "
+            f"{error['rmse_second_half']:.2f}), last {settings['error_window']}: "
+            f"{error['last_window_rmse']}"
+        )
     print(f"wrote {OUTPUT_DIR / 'drift.json'} and drift.png")
 
 

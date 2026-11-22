@@ -1,11 +1,13 @@
-"""Data drift: do the sensors received in production still look like the ones the model learnt on?
+"""Monitoring of the model in service: data drift on its inputs, and its real error over time.
 
-Each sensor is compared on its own, reference (a normal period of service) against current
-(the last cycle of every request logged by the API).
+Data drift: each sensor is compared on its own, reference (a normal period of service) against
+current (the last cycle of every request logged by the API). Real error: each logged prediction
+against the true remaining life, when the simulation has written it.
 """
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp, wasserstein_distance
 
@@ -17,6 +19,16 @@ MONITORING_DIR = ROOT / "monitoring"  # what the simulated production writes (no
 def load_prediction_log(path: Path) -> pd.DataFrame:
     """The API's log (JSON Lines) as a table: one row per prediction, in order of arrival."""
     return pd.read_json(path, lines=True)
+
+
+def reference_period(test: pd.DataFrame, n_engines: int) -> pd.DataFrame:
+    """The reference of the drift report: every cycle of test engines 1 to n_engines.
+
+    Not the training engines: those are followed until failure, while engines in service are
+    seen at every stage of their life, mostly before the end. Compared with full lives, a normal
+    fleet already looks drifted (see the phase 13 notes).
+    """
+    return test[test["unit_id"] <= n_engines]
 
 
 def build_drift_report(
@@ -53,3 +65,26 @@ def build_drift_report(
         "drifted_sensors": drifted,
         "sensors": rows,
     }
+
+
+def join_ground_truth(log: pd.DataFrame, truth: pd.DataFrame) -> pd.DataFrame:
+    """The logged predictions whose true remaining life is known, still in order of arrival.
+
+    Predictions without a truth (an engine replayed by the dashboard, for example) are left out.
+    """
+    truth = truth.drop_duplicates(["unit_id", "cycle"], keep="last")
+    # an inner merge keeps the order of the left table: the order of arrival
+    return log.merge(truth[["unit_id", "cycle", "rul_true"]], on=["unit_id", "cycle"])
+
+
+def error_over_time(joined: pd.DataFrame, cap: int, window: int) -> pd.DataFrame:
+    """Add the error of each prediction and the RMSE of the last `window` predictions.
+
+    The truth is capped like the training target: above `cap` cycles, the model is not asked
+    to tell 150 from 200. rolling_rmse is empty until `window` predictions have arrived.
+    """
+    df = joined.reset_index(drop=True)
+    df["rul_true_clipped"] = df["rul_true"].clip(upper=cap)
+    df["error"] = df["rul"] - df["rul_true_clipped"]
+    df["rolling_rmse"] = np.sqrt((df["error"] ** 2).rolling(window).mean())
+    return df

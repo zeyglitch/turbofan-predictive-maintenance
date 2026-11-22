@@ -139,6 +139,7 @@ then open http://localhost:8501. The dashboard reads the files written by the pi
 - **Models**: the six models' scores, the networks' learning curves, predictions against truth, errors and the alert's confusion matrix.
 - **Engine view**: one test engine replayed cycle by cycle, with the prediction and its interval at each cycle, asked to the API. Start the API first (`uvicorn api.main:app --port 8000`); the page says so if it does not answer. `API_URL` changes the API's address.
 - **Explainability**: SHAP for XGBoost, permutation importance for the LSTM, one prediction explained.
+- **Live monitoring**: the predictions logged by the API, data drift sensor by sensor and the real error over time, refreshed every 5 seconds while a simulation runs (see below).
 - **Glossary**: the project's terms, explained simply, with a search box.
 
 `python -m` matters: it puts the project folder on Python's import path, so the pages find `turbofan/` and `dashboard/`.
@@ -187,6 +188,18 @@ python -m pipeline.monitor
 | `normal` | 6,757 | none (largest distance 0.083) | 0.00 |
 | `sensor_offset` | 6,757 | `s_4` (0.449), `s_11` (0.452) | 0.14 |
 | `new_fault_mode` | 16,596 | 13 of 14, all but `s_14` | 0.93 |
+
+The drift is measured on everything logged so far: with few engines, it raises false alarms (replaying engines 51 to 95 without any offset already flags 9 sensors). Read it on many engines.
+
+When the truth has been written, `monitor` also measures the real error: the RMSE against the true remaining life, capped at 125, on every cycle sent, and on a rolling window of the last 2,000 predictions (about 15 engines):
+
+| Scenario | RMSE | First half | Second half | Rolling RMSE, lowest / highest |
+|---|---|---|---|---|
+| `normal` | 14.94 | 14.72 | 15.14 | 13.0 / 17.2 |
+| `sensor_offset` | 23.08 | 14.72 | 29.14 | 13.9 / 35.7 |
+| `new_fault_mode` | 22.80 | 20.94 | 24.53 | 12.0 / 30.9 |
+
+This RMSE covers every cycle, not only the last one of each engine, so it is not comparable with the test RMSE of the evaluation. The **Live monitoring** page of the dashboard shows the same figures while the predictions arrive.
 
 The test is written with scipy rather than Evidently: Evidently 0.7.23 requires plotly < 6 and does not import with pandas 3.1.
 

@@ -16,6 +16,7 @@ import yaml
 
 from turbofan.config import ROOT, load_params
 from turbofan.data import load_raw
+from turbofan.monitoring import load_prediction_log
 
 
 def root() -> Path:
@@ -73,6 +74,16 @@ def read_csv(file: Path) -> pd.DataFrame:
 @st.cache_data
 def _read_csv(file: str, mtime: float) -> pd.DataFrame:
     return pd.read_csv(file)
+
+
+def read_jsonl(file: Path) -> pd.DataFrame:
+    """A JSON Lines log of the simulated production; read again each time it grows."""
+    return _read_jsonl(str(file), file.stat().st_mtime)
+
+
+@st.cache_data(max_entries=4)  # a long log weighs a few MB: keep only the latest versions
+def _read_jsonl(file: str, mtime: float) -> pd.DataFrame:
+    return load_prediction_log(Path(file))
 
 
 def read_raw(subset: str, part: str) -> pd.DataFrame:

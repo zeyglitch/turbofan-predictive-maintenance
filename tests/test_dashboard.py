@@ -26,7 +26,9 @@ PAGES = [
     "views/models.py",
     "views/engine_view.py",
     "views/explainability.py",
+    "views/live_monitoring.py",
 ]
+LIVE = "views/live_monitoring.py"
 GLOSSARY = "views/glossary.py"
 MODELS = ["baseline", "ridge", "random_forest", "xgboost", "lstm", "cnn"]
 PARTS = {"train": [1, 2, 3, 4], "val": [5, 6], "calib": [7, 8]}
@@ -135,7 +137,22 @@ def toy_root(tmp_path, small_fleet):
     )
     for name in ("xgboost_shap_beeswarm.png", "xgboost_shap_one_prediction.png"):
         plt.imsave(explain / name, np.zeros((4, 4, 3)))  # a tiny black image
+
+    write_simulation(tmp_path, small_fleet, s_11_shift=0.0)
     return tmp_path
+
+
+def write_simulation(root, fleet: pd.DataFrame, s_11_shift: float) -> None:
+    """The two logs of a simulation: every cycle of the fleet predicted 10 cycles too high."""
+    logged = fleet.assign(s_11=fleet["s_11"] + s_11_shift)
+    truth = 200 - fleet["cycle"]  # capped at 125 by the page
+    logged = logged.assign(rul=truth.clip(upper=125) + 10.0, rul_low=0.0, rul_high=125.0)
+    monitoring = root / "monitoring"
+    monitoring.mkdir(exist_ok=True)
+    logged.to_json(monitoring / "predictions.jsonl", orient="records", lines=True)
+    fleet[["unit_id", "cycle"]].assign(scenario="normal", rul_true=truth).to_json(
+        monitoring / "ground_truth.jsonl", orient="records", lines=True
+    )
 
 
 @pytest.fixture
@@ -224,3 +241,36 @@ def test_glossary_filters_the_terms(monkeypatch):
     assert 0 < len(app.markdown) < n_terms
     app.text_input[0].set_value("no such word").run()
     assert "No term matches" in app.info[0].value
+
+
+def test_live_monitoring_without_a_log_says_to_run_a_simulation(toy_root, monkeypatch):
+    (toy_root / "monitoring" / "predictions.jsonl").unlink()
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    app = open_page(LIVE)
+    assert not app.exception
+    assert "python -m pipeline.simulate" in app.info[0].value
+
+
+def test_live_monitoring_shows_the_error_and_no_drift_on_unchanged_sensors(toy_root, monkeypatch):
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    metrics = {m.label: m.value for m in open_page(LIVE).metric}
+    assert metrics["Scenario"] == "normal"
+    assert metrics["Engines"] == "8"
+    # the reference is the same toy fleet: nothing drifts
+    assert metrics["Drift share"] == "0.00"
+    # every prediction is 10 cycles too high; the toy fleet has fewer than 2000 cycles in all
+    assert metrics["RMSE, last 2000 predictions"] == "n/a"
+
+
+def test_live_monitoring_puts_the_shifted_sensor_first(toy_root, small_fleet, monkeypatch):
+    write_simulation(toy_root, small_fleet, s_11_shift=3.0)  # far more than s_11's spread
+    params = (toy_root / "params.yaml").read_text(encoding="utf-8")
+    params = params.replace("error_window: 2000", "error_window: 100")
+    (toy_root / "params.yaml").write_text(params, encoding="utf-8")
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    app = open_page(LIVE)
+    metrics = {m.label: m.value for m in app.metric}
+    assert metrics["Drift share"] == f"{1 / 14:.2f}"
+    assert metrics["RMSE, last 100 predictions"] == "10.0 cycles"
+    assert app.selectbox[0].value == "s_11"  # sensors sorted by distance
+    assert not app.warning  # one sensor of 14 is below the retraining share

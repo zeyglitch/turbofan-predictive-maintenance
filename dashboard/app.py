@@ -47,6 +47,12 @@ pages = [
         help="Which inputs the models rely on: SHAP for XGBoost, permutation for the LSTM.",
     ),
     st.Page(
+        "views/live_monitoring.py",
+        title="Live monitoring",
+        icon=":material/sensors:",
+        help="The model in service: what the API receives, data drift and the real error.",
+    ),
+    st.Page(
         "views/glossary.py",
         title="Glossary",
         icon=":material/menu_book:",

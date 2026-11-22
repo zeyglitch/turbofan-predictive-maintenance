@@ -73,3 +73,4 @@ monitoring:
   new_fault_subset: FD003
   drift_threshold: 0.1
   drift_share_threshold: 0.3
+  error_window: 2000  # predictions in the rolling RMSE, about 15 engines
