@@ -441,7 +441,7 @@ The same chain applies to equipment that degrades with use and carries sensors: 
 
 ## How this project was made
 
-This project was built with the help of an AI assistant (Claude Code, by Anthropic). I wrote the brief and the plan, chose the tools and the trade-offs at each step, and the assistant wrote most of the code phase by phase; I reviewed every phase, approved every commit and studied line-by-line explanations of every file, so that I can explain each choice.
+This project was built with the help of an AI assistant (Claude Code, by Anthropic). I defined the goals and constraints, built the plan with the assistant through a long question-and-answer process, and made the choices and trade-offs at each step; the assistant wrote most of the code, phase by phase. I reviewed and tested every phase before approving its commit, and studied a written explanation of every phase so that I can explain each choice.
 
 ## Data and citation
 
