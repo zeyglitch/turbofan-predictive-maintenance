@@ -4,6 +4,88 @@
 
 Predicting how many flight cycles a turbofan engine has left before failure, using NASA's simulated C-MAPSS data.
 
+This is a student project: a complete, small-scale machine learning chain that runs on a laptop. Six models are trained to predict the remaining useful life (RUL) of an engine from its sensors; the best one on the validation engines is served by an API, shown in a dashboard, watched for data drift in a simulated production, and retrained by a flow when the drift is high. Every step is reproducible with one command (`dvc repro`), and every training run is recorded (MLflow).
+
+![Overview page of the dashboard](docs/screenshots/overview.png)
+
+## What it does
+
+```
+NASA C-MAPSS files
+   │  download (checksum)          data/raw/
+   ▼
+prepare ── target (RUL capped at 125), engines split train / validation / calibration,
+   │       sensors scaled on the training engines only            data/processed/
+   ├──► featurize ── rolling mean and std over 30 cycles           data/features/
+   │       └──► train_classic ── baseline, Ridge, random forest, XGBoost
+   └──► train_deep ── LSTM and 1D CNN on windows of 50 cycles
+             │
+             ▼
+evaluate ── test RMSE, alert precision and recall, 90 % conformal interval
+   │
+   ▼
+register ── champion = lowest validation RMSE → MLflow registry + models/champion/
+   │
+   ├──► API (FastAPI)  POST /predict ──► dashboard (Streamlit), Engine view
+   │        │ every prediction logged
+   │        ▼
+   │    drift report (Wasserstein distance per sensor) ──► Live monitoring
+   │        │ drift share ≥ 0.3
+   │        ▼
+   └──  retraining flow (Prefect): challenger trained on more data, promoted only if a
+        written rule says so on the validation engines
+```
+
+The stages from `download` to `register` (and `explain`) are declared in `dvc.yaml`. MLflow records the runs, pytest and ruff run on GitHub Actions at every push, and Docker Compose starts the API, the dashboard and the MLflow interface together.
+
+## Results
+
+FD001 (one fault mode, one flight regime), 100 test engines, RMSE in cycles at the last known cycle of each test engine. The true remaining life is capped at 125 cycles, like the training target; in brackets, against the true value, not capped (11 test engines have more than 125 cycles left).
+
+| Model | Validation RMSE | Test RMSE | Test MAE | Alert recall (≤ 30 cycles) | 90 % interval coverage |
+|---|---|---|---|---|---|
+| Constant baseline | 42.10 | 42.31 (43.40) | 34.85 | 0.00 | 0.88 |
+| Ridge | 20.41 | 17.45 (18.70) | 14.12 | 0.52 | 0.95 |
+| Random forest | 17.82 | 17.14 (18.25) | 12.48 | 0.68 | 0.95 |
+| XGBoost | 17.03 | 16.13 (17.24) | 12.12 | 0.80 | 0.91 |
+| **LSTM (champion)** | **11.09** | **14.85 (16.09)** | **11.01** | **0.80** | **0.91** |
+| 1D CNN | 16.52 | 18.45 (19.41) | 14.87 | 0.68 | 0.88 |
+
+Validation scores use every cycle of the 15 validation engines, test scores the last cycle of the 100 test engines: compare models within a column. With 100 test engines, a test RMSE moves by about ±2.5 cycles from one sample of engines to another (bootstrap), so models less than 2 or 3 cycles apart are not told apart. The same chain on FD002, FD003 and FD004 is in [The other subsets](#the-other-subsets-fd002-fd003-fd004).
+
+**Comparison with the literature.** Two often-cited papers report results on the same data: Zheng et al. (2017), an LSTM, and Li, Ding and Sun (2018), a deep CNN. Their figures are not reproduced here: the articles could not be read in full for this project, and a number is only written once its source has been read. Their protocols also differ (target cap, window length, which test cycle is scored, whether the true test RUL is capped), which changes RMSE by several cycles, as the two columns above show.
+
+| Models | Engine view | Live monitoring |
+|---|---|---|
+| ![Models page](docs/screenshots/models.png) | ![Engine view page](docs/screenshots/engine_view.png) | ![Live monitoring page](docs/screenshots/live_monitoring.png) |
+
+## Quick start
+
+On Windows PowerShell, with Python 3.13 (details in [Installation](#installation)):
+
+```powershell
+git clone https://github.com/zeyglitch/turbofan-predictive-maintenance.git
+cd turbofan-predictive-maintenance
+py -3.13 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+dvc repro
+```
+
+`dvc repro` downloads the data, trains the six models and writes the champion. On a laptop processor, installing the libraries took about six minutes and `dvc repro` about three and a half, from a fresh clone. Then, in two terminals:
+
+```powershell
+uvicorn api.main:app --port 8000
+```
+
+```powershell
+python -m streamlit run dashboard/app.py
+```
+
+and open http://localhost:8501. With Docker Desktop started, after `dvc repro`, `docker compose up --build` runs the API, the dashboard and MLflow together (see [Run with Docker](#run-with-docker)).
+
+The sections below go through the chain one stage at a time.
+
 ## Installation
 
 Python 3.13 is required. The commands below are for Windows PowerShell.
@@ -152,7 +234,7 @@ then open http://localhost:8501. The dashboard reads the files written by the pi
 - **Engine view**: one test engine replayed cycle by cycle, with the prediction and its interval at each cycle, asked to the API. Start the API first (`uvicorn api.main:app --port 8000`); the page says so if it does not answer. `API_URL` changes the API's address.
 - **Explainability**: SHAP for XGBoost, permutation importance for the LSTM, one prediction explained.
 - **Live monitoring**: the predictions logged by the API, data drift sensor by sensor and the real error over time, refreshed every 5 seconds while a simulation runs (see below).
-- **Retraining**: each run of the retraining flow, the champion against the challenger on the test engines, and the decision (see below).
+- **Retraining**: each run of the retraining flow, the champion against the challenger on the validation engines (which decide) and on the test engines (reported only), and the decision (see below).
 - **Glossary**: the project's terms, explained simply, with a search box.
 
 `python -m` matters: it puts the project folder on Python's import path, so the pages find `turbofan/` and `dashboard/`.
@@ -322,3 +404,50 @@ Data and models are not stored in git: DVC keeps them in `.dvc/cache` and in a l
 ruff check .
 pytest
 ```
+
+## Repository structure
+
+```
+turbofan/        the shared code: loading, target, split, scaling, features, windows, models,
+                 metrics, conformal intervals, prediction, drift, retraining rule
+pipeline/        one script per DVC stage (download … register, explain), plus grid, simulate,
+                 monitor and collect_subsets, run with python -m pipeline.<name>
+flows/           the Prefect retraining flow
+api/             the FastAPI prediction service and its request/response schemas
+dashboard/       the Streamlit app: app.py, one file per page in views/, loaders, glossary
+tests/           pytest: calculations, API, dashboard pages, a miniature run of the chain
+notebooks/       01_exploration.ipynb, the first look at the data
+docs/            the screenshots of this README
+params.yaml      every setting of the chain
+dvc.yaml         the stages, their inputs and outputs; dvc.lock records what was used
+Dockerfile.api, Dockerfile.dashboard, docker-compose.yml
+requirements*.txt  pinned versions: all (dev), the API image, the dashboard image
+```
+
+## Known limits
+
+- **Simulated data.** C-MAPSS comes from a simulator. Real sensors are noisier, fail, drift with maintenance, and real engines are rarely run to failure.
+- **The cap shapes the scores.** The target and the true test RUL are capped at 125. The model cannot say how long a young engine will live, only that it has at least about 125 cycles left; the uncapped RMSE shows the difference.
+- **Small validation sets.** 15 validation engines for FD001 and FD003: the champion and the early stopping rely on few engines, and validation scores are somewhat optimistic.
+- **One set of settings for all subsets.** Settings were tuned on FD001 only. The smaller CNN, better on FD001, is worse on FD003.
+- **The CNN's test score was seen twice.** Its settings were changed after its first test score was known; the choice used the validation engines only, but its current test score is not a first reading.
+- **Drift reference.** The drift is measured against a fixed period of FD001 service; after a promotion the reference is not updated, so the new engines still look drifted. With few engines, the drift test raises false alarms.
+- **Promotion is slightly biased towards the challenger.** It chose its best epoch on the FD003 validation engines it is then judged on; the champion never saw them.
+- **Local only.** No cloud, no authentication on the API, no scheduled runs: the retraining flow is started by hand.
+
+## From jet engines to medical and pharmaceutical equipment
+
+The same chain applies to equipment that degrades with use and carries sensors: imaging devices (an MRI scanner's cooling system, an X-ray tube), dialysis machines, infusion pumps, or, in pharmaceutical production, bioreactors, freeze-dryers, tablet presses and the air handling of clean rooms. A stopped freeze-dryer can mean a lost batch; an unplanned stop of an imaging device means postponed patients. What carries over directly: an engine-wise split to avoid leaks, a calibrated interval rather than a single number, an alert tuned on the cost of a missed failure, drift monitoring, and traceability (DVC, MLflow, a written promotion rule), which regulated settings (GMP, medical device quality systems) ask for. What changes: run-to-failure histories are rare, because equipment is maintained before it fails, so the target often becomes a health index or an anomaly score rather than a remaining life; and any model used for a maintenance decision would have to be validated as part of the quality system.
+
+## How this project was made
+
+This project was built with the help of an AI assistant (Claude Code, by Anthropic). I wrote the brief and the plan, chose the tools and the trade-offs at each step, and the assistant wrote most of the code phase by phase; I reviewed every phase, approved every commit and studied line-by-line explanations of every file, so that I can explain each choice.
+
+## Data and citation
+
+NASA C-MAPSS "Turbofan Engine Degradation Simulation" dataset, from the NASA Prognostics Center of Excellence data repository. Reference:
+
+A. Saxena, K. Goebel, D. Simon and N. Eklund, "Damage Propagation Modeling for Aircraft Engine Run-to-Failure Simulation", *International Conference on Prognostics and Health Management (PHM08)*, Denver, 2008.
+
+The code is under the MIT licence (`LICENSE`).
+
