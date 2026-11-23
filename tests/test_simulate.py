@@ -54,5 +54,5 @@ def test_on_fd001_the_true_rul_of_the_last_cycles_is_the_rul_file():
     rul = true_rul(test, load_test_rul("FD001"))
     last_rows = test.groupby("unit_id")["cycle"].idxmax()
     assert rul[last_rows].tolist() == load_test_rul("FD001").tolist()
-    assert rul.min() == 7  # engine 34, the closest to failure (phase 8)
+    assert rul.min() == 7  # engine 34, the closest to failure of the test set
     assert load_params()["monitoring"]["offset_sensors"] == ["s_11", "s_4"]

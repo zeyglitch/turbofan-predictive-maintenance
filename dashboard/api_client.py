@@ -1,4 +1,4 @@
-"""The dashboard's only way to get a prediction: HTTP calls to the API of phase 10.
+"""The dashboard's only way to get a prediction: HTTP calls to the prediction API (api/).
 
 API_URL is the API's address (http://127.0.0.1:8000 by default; in Docker, http://api:8000).
 """

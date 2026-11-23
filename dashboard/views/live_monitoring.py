@@ -96,7 +96,7 @@ def live_view() -> None:
     if report["drift_share"] >= settings["drift_share_threshold"]:
         st.warning(
             f"{report['drift_share']:.0%} of the sensors drift: the model receives data unlike "
-            "the normal period. Retraining is suggested (phase 14).",
+            "the normal period. Retraining is suggested (python -m flows.retrain_flow).",
             title="Retraining suggested",
             icon=":material/warning:",
         )

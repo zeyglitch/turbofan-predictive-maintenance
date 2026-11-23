@@ -19,7 +19,7 @@ from turbofan.tracking import log_metrics, start_run
 
 GRID = {"max_depth": [3, 5, 7], "learning_rate": [0.03, 0.1]}
 LSTM_GRID = {"hidden_size": [32, 64, 128], "window_length": [20, 30, 50]}
-# against the overfitting seen in the audit: shallower trees, more rows in each leaf
+# against the overfitting of the forest: shallower trees, more rows in each leaf
 FOREST_GRID = {"max_depth": [6, 8, 12], "min_samples_leaf": [5, 20, 50]}
 # against the overfitting of the CNN: dropout, and fewer filters
 CNN_GRID = {"dropout": [0.0, 0.3], "channels": [[32, 64, 64], [16, 32, 32]]}

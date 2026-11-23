@@ -1,8 +1,8 @@
 """Add the target, split engines, scale sensors and write the processed tables.
 
-The DVC stage prepares params data.subset (FD001). The retraining flow of phase 14 calls
-prepare() with FD001 + FD003 and its own output folders. With regimes.normalize (FD002, FD004,
-phase 15), each sensor is scaled within its flight regime.
+The DVC stage prepares params data.subset (FD001). The retraining flow (flows/) calls
+prepare() with FD001 + FD003 and its own output folders. With regimes.normalize (FD002 and
+FD004, six flight regimes), each sensor is scaled within its regime.
 """
 
 import json

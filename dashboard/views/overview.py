@@ -62,7 +62,7 @@ with st.container(horizontal=True):
         border=True,
     )
 
-# the retraining flow (phase 14) can replace models/champion without going through DVC
+# the retraining flow can replace models/champion without going through DVC
 bundle_file = loaders.path("models", "champion", "metadata.json")
 if bundle_file.exists():
     served = loaders.read_json(bundle_file)

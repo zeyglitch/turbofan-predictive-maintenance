@@ -13,7 +13,7 @@ def engine_lifetimes(df: pd.DataFrame) -> pd.Series:
 def sensor_summary(df: pd.DataFrame, kept: list[str]) -> pd.DataFrame:
     """One row per raw sensor: spread, number of distinct values, used or not, and why.
 
-    The rule of phase 1: a sensor with at most two distinct values says nothing about wear.
+    The rule used everywhere: a sensor with at most two distinct values says nothing about wear.
     """
     summary = pd.DataFrame(
         {"std": df[SENSOR_COLUMNS].std(), "distinct_values": df[SENSOR_COLUMNS].nunique()}

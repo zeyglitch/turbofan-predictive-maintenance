@@ -26,7 +26,7 @@ def reference_period(test: pd.DataFrame, n_engines: int) -> pd.DataFrame:
 
     Not the training engines: those are followed until failure, while engines in service are
     seen at every stage of their life, mostly before the end. Compared with full lives, a normal
-    fleet already looks drifted (see the phase 13 notes).
+    fleet already looks drifted, even when nothing has changed.
     """
     return test[test["unit_id"] <= n_engines]
 

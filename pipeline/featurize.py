@@ -1,7 +1,7 @@
 """Add rolling means and standard deviations of the sensors to the processed tables.
 
 The DVC stage reads data/processed. featurize() takes its folders as arguments, so that another
-preparation (FD001 + FD003, phase 14) can get the same features; the retraining flow does not
+preparation (FD001 + FD003, retraining) can get the same features; the retraining flow does not
 need it yet, since its champion is a network.
 """
 

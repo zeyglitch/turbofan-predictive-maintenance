@@ -1,4 +1,4 @@
-"""Several C-MAPSS subsets as one fleet: FD001 + FD003 for the challenger of phase 14.
+"""Several C-MAPSS subsets as one fleet: FD001 + FD003 for the challenger of the retraining.
 
 Each subset numbers its engines from 1, so engine 1 of FD003 would be mistaken for engine 1 of
 FD001. The engines of the n-th subset of the list get 1000 * n added to their unit_id: with

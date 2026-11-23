@@ -10,7 +10,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # every prediction is appended here, for the monitoring of phase 13
+      # every prediction is appended here, for the drift monitoring
       PREDICTION_LOG: /app/monitoring/predictions.jsonl
     volumes:
       - ./models/champion:/app/models/champion:ro

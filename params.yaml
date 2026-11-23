@@ -8,7 +8,7 @@ prepare:
   sensors: [s_2, s_3, s_4, s_7, s_8, s_9, s_11, s_12, s_13, s_14, s_15, s_17, s_20, s_21]
 
 regimes:
-  # phase 15: FD002 and FD004 fly at six regimes; scale each sensor within its regime
+  # FD002 and FD004 fly at six regimes; true: scale each sensor within its own regime
   normalize: false
 
 split:
@@ -74,7 +74,7 @@ explain:
   permutation_repeats: 5
 
 monitoring:
-  # simulated production (phase 13). Test FD001 engines 1 to reference_engines are the normal
+  # simulated production. Test FD001 engines 1 to reference_engines are the normal
   # period of service the drift is measured against; the simulation replays the others.
   reference_engines: 50
   offset_sensors: [s_11, s_4]
@@ -86,7 +86,7 @@ monitoring:
   error_window: 2000  # predictions in the rolling RMSE, about 15 engines
 
 retraining:
-  # phase 14: the challenger is trained on FD001 + extra_subset, then compared with the champion
+  # the challenger is trained on FD001 + extra_subset, then compared with the champion
   # on the validation engines of both subsets (the test engines are only reported)
   extra_subset: FD003
   min_improvement: 0.02  # RMSE on all validation engines lowered by at least 2 %
