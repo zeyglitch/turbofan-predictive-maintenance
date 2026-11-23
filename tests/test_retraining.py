@@ -1,6 +1,10 @@
+import numpy as np
+import pandas as pd
 import pytest
+from sklearn.preprocessing import StandardScaler
 
 from turbofan.config import load_params
+from turbofan.networks import build_network
 from turbofan.retraining import decide
 
 SETTINGS = {"drift_share_threshold": 0.3, "min_improvement": 0.02, "max_degradation": 0.10}
@@ -45,3 +49,30 @@ def test_the_rule_uses_the_thresholds_of_params():
     assert settings["min_improvement"] == 0.02
     assert settings["max_degradation"] == 0.10
     assert settings["drift_share_threshold"] == 0.3
+
+
+def test_validation_scores_are_split_by_subset():
+    from flows.retrain_flow import score_on_validation_engines
+
+    sensors = ["s_2", "s_3"]
+    rng = np.random.default_rng(0)
+    # two engines of the first subset, one of the second (renumbered from 1001)
+    engines = pd.DataFrame(
+        {
+            "unit_id": [1] * 20 + [2] * 20 + [1001] * 20,
+            "cycle": list(range(1, 21)) * 3,
+            "s_2": rng.normal(size=60),
+            "s_3": rng.normal(size=60),
+            "rul_clipped": list(range(19, -1, -1)) * 3,
+        }
+    )
+    bundle = {
+        "model": build_network("lstm", 2, {"hidden_size": 4, "num_layers": 1, "dropout": 0.0}),
+        "scaler": StandardScaler().fit(engines[sensors]),
+        "metadata": {"sensors": sensors, "rul_cap": 125, "window_length": 5},
+    }
+    scores = score_on_validation_engines(bundle, engines, ["FD001", "FD003"])
+    assert set(scores) == {"FD001", "FD003", "all"}
+    # "all" weighs every cycle: it lies between the two subsets
+    low, high = sorted([scores["FD001"], scores["FD003"]])
+    assert low <= scores["all"] <= high

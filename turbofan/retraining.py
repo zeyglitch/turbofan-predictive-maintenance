@@ -1,7 +1,8 @@
 """The written rule that decides whether a challenger replaces the champion.
 
-Scores are test RMSE on the last cycle of each engine: "all" for every test engine of the
-subsets (200 for FD001 + FD003), plus one key per subset ("FD001", "FD003").
+Scores are validation RMSE on every cycle of the validation engines: "all" for the validation
+engines of every subset (30 for FD001 + FD003), plus one key per subset ("FD001", "FD003").
+The test engines never decide; the flow only reports their scores.
 """
 
 import json
@@ -15,8 +16,8 @@ def decide(
     """Return {"retrain", "promote", "improvement", "fd001_change", "reason"}.
 
     No retraining below the drift threshold. Then the challenger is promoted only if it lowers
-    the RMSE on all test engines by at least min_improvement, and raises the RMSE on FD001 by
-    less than max_degradation: a better average must not hide a worse model on the old engines.
+    the RMSE on all validation engines by at least min_improvement, and raises the RMSE on FD001
+    by less than max_degradation: a better average must not hide a worse model on the old engines.
     """
     if drift_share < settings["drift_share_threshold"]:
         return {
@@ -34,7 +35,7 @@ def decide(
     if improvement < settings["min_improvement"]:
         promote = False
         reason = (
-            f"RMSE on all test engines improved by {improvement:.1%}, "
+            f"RMSE on all validation engines improved by {improvement:.1%}, "
             f"less than the {settings['min_improvement']:.0%} required"
         )
     elif fd001_change >= settings["max_degradation"]:
@@ -46,7 +47,7 @@ def decide(
     else:
         promote = True
         reason = (
-            f"RMSE on all test engines improved by {improvement:.1%} "
+            f"RMSE on all validation engines improved by {improvement:.1%} "
             f"and FD001 changed by {fd001_change:+.1%}"
         )
     return {

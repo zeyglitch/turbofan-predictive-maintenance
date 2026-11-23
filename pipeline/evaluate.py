@@ -1,6 +1,8 @@
 """Score the six models on the 100 test engines, with intervals calibrated on the calib engines.
 
 The test set is read here for the first time: nothing in this script chooses or tunes a model.
+The true remaining life is capped at 125, like the training target: a test engine with 180
+cycles left counts as 125. rmse_uncapped compares the same predictions with the true value.
 """
 
 import json
@@ -15,7 +17,7 @@ from turbofan.classic_models import predict
 from turbofan.config import FEATURES_DIR, MODELS_DIR, PROCESSED_DIR, REPORTS_DIR, load_params
 from turbofan.conformal import conformal_quantile, empirical_coverage, prediction_interval
 from turbofan.features import feature_columns, last_row_per_unit
-from turbofan.metrics import evaluate_predictions
+from turbofan.metrics import evaluate_predictions, rmse
 from turbofan.networks import build_network
 from turbofan.training import predict_network
 from turbofan.windows import last_window_per_unit, make_windows
@@ -68,10 +70,15 @@ def main() -> None:
     cap = params["prepare"]["rul_cap"]
     coverage = params["conformal"]["coverage"]
     threshold = params["alert"]["threshold"]
-    unit_ids = last_row_per_unit(pd.read_parquet(PROCESSED_DIR / "test.parquet"))["unit_id"]
+    last_test_rows = last_row_per_unit(pd.read_parquet(PROCESSED_DIR / "test.parquet"))
+    unit_ids = last_test_rows["unit_id"]
+    # the true remaining life, not capped: the models never predict more than the cap, so the
+    # engines still far from failure count as errors here
+    y_test_uncapped = last_test_rows["rul"].to_numpy()
 
     results, predictions = {}, []
-    print(f"{'model':<15}{'rmse':>7}{'mae':>7}{'nasa':>9}{'recall':>8}{'q':>7}{'coverage':>10}")
+    header = f"{'model':<15}{'rmse':>7}{'uncapped':>10}{'mae':>7}{'nasa':>9}{'recall':>8}{'q':>7}"
+    print(header + f"{'coverage':>10}")
     for name in MODELS:
         model = load_trained(name, params)
         # q comes from engines that took part in no training and no choice
@@ -81,6 +88,7 @@ def main() -> None:
         low, high = prediction_interval(test_pred, q, cap)
         metrics = evaluate_predictions(y_test, test_pred, cap, threshold)
         results[name] = metrics | {
+            "rmse_uncapped": rmse(y_test_uncapped, test_pred),
             "conformal_q": q,
             "coverage": empirical_coverage(y_test, low, high),
         }
@@ -90,6 +98,7 @@ def main() -> None:
                     "model": name,
                     "unit_id": unit_ids.to_numpy(),
                     "rul_true": y_test,
+                    "rul_true_uncapped": y_test_uncapped,
                     "rul_pred": test_pred,
                     "rul_low": low,
                     "rul_high": high,
@@ -98,7 +107,8 @@ def main() -> None:
         )
         r = results[name]
         print(
-            f"{name:<15}{r['rmse']:>7.2f}{r['mae']:>7.2f}{r['nasa_score']:>9.1f}"
+            f"{name:<15}{r['rmse']:>7.2f}{r['rmse_uncapped']:>10.2f}{r['mae']:>7.2f}"
+            f"{r['nasa_score']:>9.1f}"
             f"{r['recall']:>8.2f}{q:>7.1f}{r['coverage']:>10.2f}"
         )
 

@@ -33,8 +33,8 @@ stages:
       nfiles: 13
     - path: pipeline/prepare.py
       hash: md5
-      md5: c84bd08e8b100ef3613cdd0724effde1
-      size: 3859
+      md5: 539648a768e701b010b26aae0d00fba7
+      size: 4046
     - path: turbofan/config.py
       hash: md5
       md5: da0955c3eaeafed6e3628ca38b4fafc7
@@ -83,8 +83,8 @@ stages:
           normalize: false
         split:
           seed: 42
-          n_val: 15
-          n_calib: 15
+          val_share: 0.15
+          calib_share: 0.15
     outs:
     - path: data/processed
       hash: md5
@@ -259,8 +259,8 @@ stages:
       size: 2496
     - path: turbofan/networks.py
       hash: md5
-      md5: 6f306e38737dce49e298539d751d021a
-      size: 2756
+      md5: 0e9c490e1cf2a0e975e061646565f41a
+      size: 3156
     - path: turbofan/plots.py
       hash: md5
       md5: fa04dc9c09c5840ad232bd0b0da458d1
@@ -279,10 +279,11 @@ stages:
           threshold: 30
         cnn:
           channels:
+          - 16
           - 32
-          - 64
-          - 64
+          - 32
           kernel_size: 5
+          dropout: 0.0
         data.subset: FD001
         lstm:
           hidden_size: 128
@@ -317,20 +318,20 @@ stages:
     outs:
     - path: models/cnn.pt
       hash: md5
-      md5: 337f0b08f01a87631faf36db69b35426
-      size: 135957
+      md5: 9a952c5835b6e7a5a5178bd426a09e42
+      size: 38869
     - path: models/lstm.pt
       hash: md5
       md5: f13166f92d5f7c813aa0ffecf1d5a867
       size: 827221
     - path: reports/metrics/val_deep.json
       hash: md5
-      md5: 7bf865d9bc0960a14ced503f94ea3dfa
-      size: 654
+      md5: 253b993d60ce767064fc9160976d94dd
+      size: 653
     - path: reports/training_curves.csv
       hash: md5
-      md5: 345b5d9297e7b12cb7b1ed88bd023ae1
-      size: 1950
+      md5: 2f9f296fcd1dba469d79b0963427f400
+      size: 3337
   evaluate:
     cmd: python -m pipeline.evaluate
     deps:
@@ -350,8 +351,8 @@ stages:
       size: 27
     - path: models/cnn.pt
       hash: md5
-      md5: 337f0b08f01a87631faf36db69b35426
-      size: 135957
+      md5: 9a952c5835b6e7a5a5178bd426a09e42
+      size: 38869
     - path: models/lstm.pt
       hash: md5
       md5: f13166f92d5f7c813aa0ffecf1d5a867
@@ -370,8 +371,8 @@ stages:
       size: 478514
     - path: pipeline/evaluate.py
       hash: md5
-      md5: 0b3d777adc8cd42f051bb550bb21c567
-      size: 4668
+      md5: 581d070e22ab22b26567bba9f090cbea
+      size: 5306
     - path: turbofan/classic_models.py
       hash: md5
       md5: 87853970b3e9a6815e757ac842e1c1f8
@@ -394,8 +395,8 @@ stages:
       size: 2496
     - path: turbofan/networks.py
       hash: md5
-      md5: 6f306e38737dce49e298539d751d021a
-      size: 2756
+      md5: 0e9c490e1cf2a0e975e061646565f41a
+      size: 3156
     - path: turbofan/training.py
       hash: md5
       md5: ccd54a799f3dc3f311c70f68b9b77650
@@ -410,10 +411,11 @@ stages:
           threshold: 30
         cnn:
           channels:
+          - 16
           - 32
-          - 64
-          - 64
+          - 32
           kernel_size: 5
+          dropout: 0.0
         conformal:
           coverage: 0.9
         lstm:
@@ -442,12 +444,12 @@ stages:
     outs:
     - path: reports/metrics/test.json
       hash: md5
-      md5: e6b807e5d336973b6a4a32cf0308cc9d
-      size: 1705
+      md5: 75af3d91131981ee002a2f2dff7cc378
+      size: 1948
     - path: reports/predictions_test.parquet
       hash: md5
-      md5: 3a70ddbd18d3155ab0a4faff377c88b9
-      size: 14688
+      md5: 2d2842c21b24119825b6060781adea81
+      size: 15973
   register:
     cmd: python -m pipeline.register
     deps:
@@ -461,8 +463,8 @@ stages:
       size: 160378
     - path: models/cnn.pt
       hash: md5
-      md5: 337f0b08f01a87631faf36db69b35426
-      size: 135957
+      md5: 9a952c5835b6e7a5a5178bd426a09e42
+      size: 38869
     - path: models/lstm.pt
       hash: md5
       md5: f13166f92d5f7c813aa0ffecf1d5a867
@@ -485,32 +487,32 @@ stages:
       size: 478514
     - path: pipeline/evaluate.py
       hash: md5
-      md5: 0b3d777adc8cd42f051bb550bb21c567
-      size: 4668
+      md5: 581d070e22ab22b26567bba9f090cbea
+      size: 5306
     - path: pipeline/register.py
       hash: md5
-      md5: 3f7701f7246c8cd047549381a338f5fc
-      size: 4055
+      md5: edabfd2e03b6d9c7b8c8de8ab945cd02
+      size: 4189
     - path: reports/metrics/test.json
       hash: md5
-      md5: e6b807e5d336973b6a4a32cf0308cc9d
-      size: 1705
+      md5: 75af3d91131981ee002a2f2dff7cc378
+      size: 1948
     - path: reports/metrics/val_classic.json
       hash: md5
       md5: 02190c07c3bb34e9c48f62057b714550
       size: 1403
     - path: reports/metrics/val_deep.json
       hash: md5
-      md5: 7bf865d9bc0960a14ced503f94ea3dfa
-      size: 654
+      md5: 253b993d60ce767064fc9160976d94dd
+      size: 653
     - path: turbofan/bundle.py
       hash: md5
       md5: ea73ecaec9d2885ee1af993f3173730d
       size: 2761
     - path: turbofan/networks.py
       hash: md5
-      md5: 6f306e38737dce49e298539d751d021a
-      size: 2756
+      md5: 0e9c490e1cf2a0e975e061646565f41a
+      size: 3156
     - path: turbofan/windows.py
       hash: md5
       md5: a34f67f9a5928530361e7de0d25c8ad7
@@ -521,10 +523,11 @@ stages:
           threshold: 30
         cnn:
           channels:
+          - 16
           - 32
-          - 64
-          - 64
+          - 32
           kernel_size: 5
+          dropout: 0.0
         data.subset: FD001
         features.rolling_window: 30
         lstm:
@@ -568,13 +571,13 @@ stages:
     outs:
     - path: models/champion
       hash: md5
-      md5: e0a74282d8bd2821dfab7e3ef3d29a38.dir
+      md5: f7cfecfb6511ceff16f6423e9a26f7f3.dir
       size: 829196
       nfiles: 3
     - path: reports/champion.json
       hash: md5
-      md5: 56cb90c3b55e71e93c598b311c43121f
-      size: 340
+      md5: 1b1c466abea0cc7c9298adb6262ae125
+      size: 384
   explain:
     cmd: python -m pipeline.explain
     deps:
@@ -596,8 +599,8 @@ stages:
       size: 478514
     - path: pipeline/evaluate.py
       hash: md5
-      md5: 0b3d777adc8cd42f051bb550bb21c567
-      size: 4668
+      md5: 581d070e22ab22b26567bba9f090cbea
+      size: 5306
     - path: pipeline/explain.py
       hash: md5
       md5: eca9ec8c0a17fe6b50123dcd8976ae67
@@ -616,8 +619,8 @@ stages:
       size: 2496
     - path: turbofan/networks.py
       hash: md5
-      md5: 6f306e38737dce49e298539d751d021a
-      size: 2756
+      md5: 0e9c490e1cf2a0e975e061646565f41a
+      size: 3156
     - path: turbofan/plots.py
       hash: md5
       md5: fa04dc9c09c5840ad232bd0b0da458d1
@@ -662,6 +665,6 @@ stages:
     outs:
     - path: reports/explain
       hash: md5
-      md5: c7a6196cce544e30cccac8db4ff012da.dir
-      size: 736120
+      md5: 332c8ed85ff3e00159dacddcb04cf45c.dir
+      size: 735848
       nfiles: 9

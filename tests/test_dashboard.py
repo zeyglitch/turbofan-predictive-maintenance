@@ -45,6 +45,7 @@ def scores(rmse: float) -> dict:
     """The keys the pipeline writes for one model in the metrics files."""
     return {
         "rmse": rmse,
+        "rmse_uncapped": rmse + 2,
         "mae": rmse * 0.8,
         "nasa_score": rmse * 30,
         "tp": 3,
@@ -167,15 +168,21 @@ def write_retraining_reports(root) -> None:
         "n_logged": 16596,
         "challenger_version": "6",
         "scores": {
-            "champion": {"FD001": 15.0, "FD003": 40.0, "all": 30.0},
-            "challenger": {"FD001": 15.5, "FD003": 24.0, "all": 20.0},
+            "validation": {
+                "champion": {"FD001": 15.0, "FD003": 40.0, "all": 30.0},
+                "challenger": {"FD001": 15.5, "FD003": 24.0, "all": 20.0},
+            },
+            "test": {
+                "champion": {"FD001": 16.0, "FD003": 45.0, "all": 34.0},
+                "challenger": {"FD001": 16.2, "FD003": 14.0, "all": 15.0},
+            },
         },
         "decision": {
             "retrain": True,
             "promote": True,
             "improvement": 1 / 3,
             "fd001_change": 0.5 / 15,
-            "reason": "RMSE on all test engines improved by 33.3% and FD001 changed by +3.3%",
+            "reason": "RMSE on all validation engines improved by 33.3% and FD001 changed by +3.3%",
         },
     }
     write_json(root / "reports" / "retraining" / "2026-11-22T100000Z.json", no_drift)
@@ -327,6 +334,21 @@ def test_retraining_shows_the_latest_run_and_every_run(toy_root, monkeypatch):
     history = app.dataframe[-1].value
     assert len(history) == 2
     assert history.iloc[0]["started_at"].startswith("2026-11-22T11")  # the latest first
+    # one table for the validation engines, which decide, one for the test engines, reported
+    validation, test = app.dataframe[0].value, app.dataframe[1].value
+    assert validation.set_index("engines").loc["all", "challenger"] == 20.0
+    assert test.set_index("engines").loc["all", "challenger"] == 15.0
+
+
+def test_retraining_still_reads_a_run_written_before_the_change(toy_root, monkeypatch):
+    path = toy_root / "reports" / "retraining" / "2026-11-22T110000Z.json"
+    old = json.loads(path.read_text(encoding="utf-8"))
+    old["scores"] = old["scores"]["test"]  # the test engines decided, a single table
+    write_json(path, old)
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    app = open_page(RETRAINING)
+    assert not app.exception
+    assert len(app.dataframe) == 2  # the test table and the history
 
 
 def test_retraining_after_a_run_without_drift(toy_root, monkeypatch):
@@ -351,7 +373,7 @@ def test_overview_warns_when_retraining_replaced_the_champion(toy_root, monkeypa
 def test_models_page_compares_the_subsets(toy_root, monkeypatch):
     def run(name, subset, by_regime, lstm_rmse):
         models = ["baseline", "ridge", "random_forest", "xgboost", "lstm", "cnn"]
-        scores = {"val_rmse": 20.0, "test_rmse": 25.0, "test_mae": 18.0}
+        scores = {"val_rmse": 20.0, "test_rmse": 25.0, "test_rmse_uncapped": 30.0, "test_mae": 18.0}
         scores |= {"test_nasa_score": 900.0, "coverage": 0.9}
         return {
             "name": name,
@@ -374,3 +396,4 @@ def test_models_page_compares_the_subsets(toy_root, monkeypatch):
     chooser.set_value("fd002-regimes").run()
     table = app.dataframe[0].value
     assert table.set_index("model").loc["lstm", "test_rmse"] == 28.0
+    assert table.set_index("model").loc["lstm", "test_rmse_uncapped"] == 30.0

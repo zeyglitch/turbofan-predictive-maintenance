@@ -48,7 +48,11 @@ with st.container(horizontal=True):
     st.metric(
         "Champion test RMSE",
         f"{champion['test_rmse']:.1f} cycles",
-        help="Typical size of the error on the 100 test engines, at their last cycle.",
+        help=(
+            "Typical size of the error on the 100 test engines, at their last cycle, with the "
+            "true remaining life capped at 125 like the training target. Against the true value, "
+            "not capped, it is higher: see Models."
+        ),
         border=True,
     )
     st.metric(

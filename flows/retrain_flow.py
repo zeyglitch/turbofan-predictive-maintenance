@@ -24,10 +24,13 @@ from turbofan.bundle import load_bundle, save_bundle
 from turbofan.config import MODELS_DIR, REPORTS_DIR, ROOT, load_params
 from turbofan.conformal import conformal_quantile
 from turbofan.data import load_raw, load_test_rul
+from turbofan.labels import add_rul
 from turbofan.metrics import rmse
 from turbofan.monitoring import MONITORING_DIR, build_drift_report, load_prediction_log
 from turbofan.predict import predict_engine
+from turbofan.preprocessing import scale_sensors
 from turbofan.retraining import decide
+from turbofan.subsets import UNIT_OFFSET, load_subsets
 from turbofan.tracking import git_state, last_run_id, register_champion, set_alias
 from turbofan.training import predict_network
 from turbofan.windows import make_windows
@@ -63,7 +66,8 @@ def train_challenger(params: dict, champion: dict) -> dict:
     """Same model type and settings as the champion, trained on FD001 + FD003.
 
     Returns the challenger as an in-memory bundle {"model", "scaler", "metadata"}: the same
-    shape as load_bundle, so predict_engine scores it exactly like the served champion.
+    shape as load_bundle, so predict_engine scores it exactly like the served champion. Also
+    "val_units": its validation engines, on which the promotion is decided.
     Only networks are handled: the champion of this project is the LSTM.
     """
     model_type = champion["model_type"]
@@ -75,7 +79,7 @@ def train_challenger(params: dict, champion: dict) -> dict:
     # the same preparation as the DVC stage, on both subsets, in folders of its own
     processed = CHALLENGER_DATA / "processed"
     scaler_path = CHALLENGER_DATA / "scaler.joblib"
-    prepare(subsets, params, processed, scaler_path, CHALLENGER_DATA / "prepare.json")
+    prepared = prepare(subsets, params, processed, scaler_path, CHALLENGER_DATA / "prepare.json")
     train, val, calib = (
         pd.read_parquet(processed / f"{p}.parquet") for p in ("train", "val", "calib")
     )
@@ -116,7 +120,34 @@ def train_challenger(params: dict, champion: dict) -> dict:
         "registry_version": version,
     }
     print(f"challenger: val rmse {metrics['rmse']:.2f} on {name}, interval q {q:.1f}")
-    return {"model": model, "scaler": joblib.load(scaler_path), "metadata": metadata}
+    return {
+        "model": model,
+        "scaler": joblib.load(scaler_path),
+        "metadata": metadata,
+        "val_units": prepared["parts"]["val"]["units"],
+    }
+
+
+def score_on_validation_engines(bundle: dict, engines: pd.DataFrame, subsets: list[str]) -> dict:
+    """RMSE on every cycle of the validation engines, per subset and on all of them together.
+
+    engines: the raw rows of the validation engines (training files, followed to failure), with
+    rul_clipped. Neither model was trained on them. The FD001 ones are the validation engines of
+    the champion too (same seed, same share): both chose their best epoch on them; the
+    challenger also chose it on the FD003 ones, which leans slightly in its favour.
+    """
+    metadata = bundle["metadata"]
+    sensors, cap = metadata["sensors"], metadata["rul_cap"]
+    # each model with its own scaler, as predict_engine does
+    df = scale_sensors(engines, bundle["scaler"], sensors)
+    X, y, units = make_windows(df, sensors, metadata["window_length"], every_cycle=True)
+    pred = predict_network(bundle["model"], X, cap)
+    scores = {
+        subset: rmse(y[units // UNIT_OFFSET == position], pred[units // UNIT_OFFSET == position])
+        for position, subset in enumerate(subsets)
+    }
+    scores["all"] = rmse(y, pred)
+    return scores
 
 
 def score_on_test_engines(bundle: dict, subsets: list[str]) -> dict:
@@ -139,24 +170,35 @@ def score_on_test_engines(bundle: dict, subsets: list[str]) -> dict:
 
 
 @task
-def evaluate_both(champion: dict, challenger: dict, subsets: list[str]) -> dict:
-    """Both models on the test engines of FD001 and FD003 (200 engines).
+def evaluate_both(champion: dict, challenger: dict, subsets: list[str], cap: int) -> dict:
+    """Both models on the validation engines (they decide) and on the test engines (reported).
 
-    The test set decides here, to keep the demonstration simple (see the README's limits).
+    Validation: the 30 validation engines of FD001 and FD003, every cycle. Test: the 200 test
+    engines, last cycle, as in the pipeline's evaluation; read after the decision is possible,
+    never used by it.
     """
+    train_rows = add_rul(load_subsets(subsets, "train"), cap)
+    engines = train_rows[train_rows["unit_id"].isin(challenger["val_units"])]
     scores = {
-        "champion": score_on_test_engines(champion, subsets),
-        "challenger": score_on_test_engines(challenger, subsets),
+        "validation": {
+            "champion": score_on_validation_engines(champion, engines, subsets),
+            "challenger": score_on_validation_engines(challenger, engines, subsets),
+        },
+        "test": {
+            "champion": score_on_test_engines(champion, subsets),
+            "challenger": score_on_test_engines(challenger, subsets),
+        },
     }
-    for who, own in scores.items():
-        print(f"{who}: " + ", ".join(f"{key} {value:.2f}" for key, value in own.items()))
+    for part, models in scores.items():
+        for who, own in models.items():
+            print(f"{part} {who}: " + ", ".join(f"{key} {value:.2f}" for key, value in own.items()))
     return scores
 
 
 @task
 def promote(challenger: dict, scores: dict, decision: dict) -> None:
     """Save the challenger in models/challenger; if promoted, it becomes models/champion."""
-    metadata = challenger["metadata"] | {"test_rmse": scores["challenger"]["all"]}
+    metadata = challenger["metadata"] | {"test_rmse": scores["test"]["challenger"]["all"]}
     shutil.rmtree(CHALLENGER_DIR, ignore_errors=True)
     save_bundle(
         CHALLENGER_DIR,
@@ -214,8 +256,12 @@ def retrain_flow() -> dict:
         return report
 
     challenger = train_challenger(params, champion["metadata"])
-    scores = evaluate_both(champion, challenger, subsets)
-    decision = decide_task(drift["drift_share"], scores["champion"], scores["challenger"], settings)
+    scores = evaluate_both(champion, challenger, subsets, params["prepare"]["rul_cap"])
+    # the validation engines decide; the test scores are only reported
+    validation = scores["validation"]
+    decision = decide_task(
+        drift["drift_share"], validation["champion"], validation["challenger"], settings
+    )
     print(f"decision: {'promote' if decision['promote'] else 'keep the champion'}")
     print(f"reason: {decision['reason']}")
     promote(challenger, scores, decision)

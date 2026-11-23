@@ -55,6 +55,7 @@ def main() -> None:
             {
                 "val_rmse": val[champion]["rmse"],
                 "test_rmse": test[champion]["rmse"],
+                "test_rmse_uncapped": test[champion]["rmse_uncapped"],
                 "test_coverage": test[champion]["coverage"],
             }
         )
@@ -88,6 +89,7 @@ def main() -> None:
         "champion": champion,
         "val_rmse": {name: val[name]["rmse"] for name in ranking},
         "test_rmse": test[champion]["rmse"],
+        "test_rmse_uncapped": test[champion]["rmse_uncapped"],
         "conformal_q": test[champion]["conformal_q"],
         "test_coverage": test[champion]["coverage"],
         "registry_version": version,

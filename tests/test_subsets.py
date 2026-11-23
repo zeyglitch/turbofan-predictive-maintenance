@@ -37,7 +37,8 @@ def test_test_rul_follows_the_same_numbers(raw_dir):
 
 def test_each_subset_is_split_on_its_own(raw_dir):
     fleet = load_subsets(["FD001", "FD003"], "train", raw_dir)
-    parts = split_by_subset(fleet, ["FD001", "FD003"], {"n_val": 2, "n_calib": 2, "seed": 42})
+    split = {"val_share": 0.25, "calib_share": 0.25, "seed": 42}
+    parts = split_by_subset(fleet, ["FD001", "FD003"], split)
     for name, expected in [("train", 4), ("val", 2), ("calib", 2)]:
         units = parts[name]["unit_id"].unique()
         # the same number of engines from each subset, never one engine in two parts
@@ -45,6 +46,16 @@ def test_each_subset_is_split_on_its_own(raw_dir):
         assert (units >= UNIT_OFFSET).sum() == expected
     all_units = pd.concat(parts.values())["unit_id"]
     assert all_units.nunique() == 16
+
+
+def test_validation_is_a_share_of_each_subset_not_a_fixed_number():
+    # 20 engines in the first subset, 40 in the second: a quarter of each goes to validation
+    ids = list(range(1, 21)) + list(range(1001, 1041))
+    fleet = pd.DataFrame({"unit_id": ids, "cycle": 1})
+    parts = split_by_subset(fleet, ["A", "B"], {"val_share": 0.25, "calib_share": 0.25, "seed": 0})
+    val = parts["val"]["unit_id"]
+    assert ((val < UNIT_OFFSET).sum(), (val >= UNIT_OFFSET).sum()) == (5, 10)
+    assert len(parts["calib"]) == 15 and len(parts["train"]) == 30
 
 
 @pytest.mark.needs_data

@@ -28,9 +28,13 @@ class LSTMRegressor(nn.Module):
 
 
 class CNNRegressor(nn.Module):
-    """1D convolutions along time, an average over time, then a linear layer."""
+    """1D convolutions along time, an average over time, then a linear layer.
 
-    def __init__(self, n_sensors: int, channels: list[int], kernel_size: int):
+    dropout > 0 switches off that share of the filter outputs at random after each convolution,
+    during training only: the network cannot lean on a few filters that fit the training engines.
+    """
+
+    def __init__(self, n_sensors: int, channels: list[int], kernel_size: int, dropout: float = 0.0):
         super().__init__()
         layers = []
         in_channels = n_sensors
@@ -40,6 +44,9 @@ class CNNRegressor(nn.Module):
                 nn.Conv1d(in_channels, out_channels, kernel_size, padding=kernel_size // 2)
             )
             layers.append(nn.ReLU())
+            if dropout > 0:
+                # only when used: without it the layers keep their numbers, and saved weights load
+                layers.append(nn.Dropout(dropout))
             in_channels = out_channels
         self.convolutions = nn.Sequential(*layers)
         self.head = nn.Linear(in_channels, 1)

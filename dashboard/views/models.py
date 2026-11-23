@@ -14,6 +14,14 @@ st.caption(
     "an LSTM and a 1D CNN. The champion is chosen on the validation engines; the test engines "
     "are only used to report the final scores below, never to choose."
 )
+# st.markdown, not st.info: on these pages st.info is the "file missing" message
+st.markdown(
+    "**How the test scores are counted.** The true remaining life is capped at 125 cycles, like "
+    "the training target: a test engine with 180 cycles left counts as 125, and a model that "
+    "says 125 makes no error on it. The *uncapped* columns compare the same predictions with the "
+    "true value. The gap is small on FD001 and FD003 (11 and 15 test engines above 125) and "
+    "large on FD002 and FD004 (57 and 67), where many test engines are still far from failure."
+)
 
 subsets_file = loaders.path("reports", "subsets.json")
 if subsets_file.exists():
@@ -69,6 +77,9 @@ if subsets_file.exists():
         column_config={
             "val_rmse": st.column_config.NumberColumn("val RMSE", format="%.1f"),
             "test_rmse": st.column_config.NumberColumn("test RMSE", format="%.1f"),
+            "test_rmse_uncapped": st.column_config.NumberColumn(
+                "test RMSE, uncapped truth", format="%.1f"
+            ),
             "test_mae": st.column_config.NumberColumn("test MAE", format="%.1f"),
             "test_nasa_score": st.column_config.NumberColumn("test NASA score", format="%.0f"),
             "coverage": st.column_config.NumberColumn("interval coverage", format="%.2f"),
@@ -107,6 +118,7 @@ scores = pd.DataFrame(
         "val RMSE": [validation[name]["rmse"] for name in test],
         "val MAE": [validation[name]["mae"] for name in test],
         "test RMSE": [test[name]["rmse"] for name in test],
+        "test RMSE, uncapped": [test[name]["rmse_uncapped"] for name in test],
         "test MAE": [test[name]["mae"] for name in test],
         "test NASA score": [test[name]["nasa_score"] for name in test],
         "interval coverage": [test[name]["coverage"] for name in test],
@@ -118,7 +130,14 @@ st.dataframe(
     hide_index=True,
     column_config={
         column: st.column_config.NumberColumn(format="%.1f")
-        for column in ["val RMSE", "val MAE", "test RMSE", "test MAE", "test NASA score"]
+        for column in [
+            "val RMSE",
+            "val MAE",
+            "test RMSE",
+            "test RMSE, uncapped",
+            "test MAE",
+            "test NASA score",
+        ]
     }
     | {"interval coverage": st.column_config.NumberColumn(format="%.2f")},
 )

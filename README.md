@@ -42,7 +42,7 @@ jupyter lab notebooks/01_exploration.ipynb
 python -m pipeline.prepare
 ```
 
-This adds the target (remaining useful life, capped at 125 cycles), splits the 100 training engines into train, validation and calibration sets (70 / 15 / 15 engines, never splitting an engine), scales the sensors with statistics learnt on the training engines only, and writes `data/processed/*.parquet`, `models/scaler.joblib` and `reports/prepare.json`.
+This adds the target (remaining useful life, capped at 125 cycles), splits the 100 training engines into train, validation and calibration sets (70 / 15 / 15 engines, never splitting an engine; for a bigger subset, the same shares: 15 % for validation, 15 % for calibration), scales the sensors with statistics learnt on the training engines only, and writes `data/processed/*.parquet`, `models/scaler.joblib` and `reports/prepare.json`.
 
 ## First models
 
@@ -77,6 +77,18 @@ python -m pipeline.train_deep
 
 `train_deep` also trains a 1D convolutional network (CNN) on the same windows.
 
+Two more grids look at overfitting, both scored on the validation engines (`python -m pipeline.grid random_forest`, `python -m pipeline.grid cnn`):
+
+| Model | Settings tried | Train RMSE | Validation RMSE | Kept |
+|---|---|---|---|---|
+| Random forest | depth 12, at least 5 rows per leaf (before) | 7.09 | 17.82 | yes |
+| Random forest | depth 6 to 12, at least 5 to 50 rows per leaf (8 other pairs) | 9.51 to 16.09 | 18.06 to 19.51 | no |
+| CNN | filters 32-64-64, no dropout (before) | 14.85 | 22.65 | no |
+| CNN | filters 16-32-32, no dropout | 7.14 | 16.52 | yes |
+| CNN | dropout 0.3, either size | 17.79 to 22.99 | 23.90 to 24.31 | no |
+
+The forest learns its training engines almost by heart, but every way of holding it back made it worse on validation, so its settings stay. The CNN with half as many filters is much better on validation (best epoch 37 instead of 7); dropout made it worse.
+
 ## Evaluation and champion model
 
 ```powershell
@@ -84,7 +96,7 @@ python -m pipeline.evaluate
 python -m pipeline.register
 ```
 
-`evaluate` scores the six models on the 100 test engines (the last cycle of each engine, compared with `RUL_FD001.txt`). It also builds a 90 % prediction interval for each model from its errors on the calibration engines (split conformal prediction), then measures how often the true value falls inside it. It writes `reports/metrics/test.json` and `reports/predictions_test.parquet`. The test set is used only here, never to choose or tune a model.
+`evaluate` scores the six models on the 100 test engines (the last cycle of each engine, compared with `RUL_FD001.txt`). The true remaining life is capped at 125, like the training target: an engine with 180 cycles left counts as 125, and a model that says 125 makes no error on it. `rmse_uncapped` compares the same predictions with the true value; on FD001 (11 test engines above 125) the LSTM goes from 14.85 to 16.09. It also builds a 90 % prediction interval for each model from its errors on the calibration engines (split conformal prediction), then measures how often the true value falls inside it. It writes `reports/metrics/test.json` and `reports/predictions_test.parquet`. The test set is used only here, never to choose or tune a model.
 
 `register` picks the model with the lowest validation RMSE, registers it in MLflow as `turbofan-rul` with the alias `champion`, and writes `models/champion/`: the model, the scaler and `metadata.json`. This folder is everything needed to predict, without MLflow.
 
@@ -218,8 +230,8 @@ Prefect runs six tasks in order and records each run:
 |---|---|
 | `check_drift` | the drift report on `monitoring/predictions.jsonl`; below a drift share of 0.3, the flow stops here |
 | `train_challenger` | the same model with the same settings as the champion, trained on FD001 + FD003 (engines of FD003 renumbered 1001 to 1100, each subset split 70/15/15), registered in MLflow with the alias `challenger` |
-| `evaluate_both` | both models on the 200 test engines of FD001 and FD003, through `predict_engine`, the function behind the API |
-| `decide` | promote only if the RMSE on the 200 engines drops by at least 2 % **and** the RMSE on FD001 rises by less than 10 % (`params.yaml`, section `retraining`) |
+| `evaluate_both` | both models on the 30 validation engines of FD001 and FD003 (every cycle), which decide, and on the 200 test engines (last cycle, through `predict_engine`, the function behind the API), which are only reported |
+| `decide` | on the validation engines: promote only if the RMSE on all of them drops by at least 2 % **and** the RMSE on the FD001 ones rises by less than 10 % (`params.yaml`, section `retraining`) |
 | `promote` | the challenger is saved in `models/challenger/`; if promoted, it replaces `models/champion/` and the alias `champion` moves to its version |
 | `write_report` | `reports/retraining/<date>.json`: trigger, drift, scores, decision and reason |
 
@@ -230,16 +242,18 @@ $env:PREFECT_HOME = ".prefect"; $env:PREFECT_SERVER_ANALYTICS_ENABLED = "false"
 prefect server start
 ```
 
-Results after a full `new_fault_mode` simulation (drift share 0.93), RMSE at the last cycle of each test engine:
+Results after a full `new_fault_mode` simulation (drift share 0.93). The champion is the LSTM of the pipeline (v8, trained on FD001), the challenger the same LSTM trained on FD001 + FD003 (v9):
 
-| Model | FD001 (100 engines) | FD003 (100 engines) | All 200 |
+| RMSE | FD001 | FD003 | All |
 |---|---|---|---|
-| Champion (LSTM v5, trained on FD001) | 14.85 | 46.25 | 34.34 |
-| Challenger (LSTM v6, trained on FD001 + FD003) | 14.67 | 13.23 | 13.97 |
+| Validation engines, every cycle (they decide): champion | 11.09 | 35.14 | 27.17 |
+| Validation engines, every cycle (they decide): challenger | 10.19 | 10.29 | 10.24 |
+| Test engines, last cycle (reported only): champion | 14.85 | 46.25 | 34.34 |
+| Test engines, last cycle (reported only): challenger | 14.67 | 13.23 | 13.97 |
 
-The challenger was promoted: 59.3 % better on the 200 engines, 1.2 % better on FD001. Replaying the simulations with it, the RMSE on every cycle went from 22.80 to 10.40 on `new_fault_mode` and from 14.94 to 12.19 on `normal`. A second run of the flow trained an identical challenger (same data, same seed): improvement 0.0 %, champion kept.
+The challenger was promoted: 62.3 % better on the 30 validation engines, 8.2 % better on the FD001 ones. The test engines played no part in the decision, so 13.97 remains an honest measure of the promoted model. The FD001 validation engines are the champion's validation engines too, and both models chose their best epoch on them; the challenger also chose it on the FD003 ones, which leans slightly in its favour.
 
-Here the test engines decide the promotion, which keeps the demonstration simple; a real project would keep a separate set of engines for this decision. The drift reference stays the FD001 period: after a promotion, the FD003 engines still look drifted.
+Before the audit of 23 November 2026, the test engines decided (same verdict: 59.3 % better on the 200 test engines). Replaying the simulations with that promoted model, the RMSE on every cycle went from 22.80 to 10.40 on `new_fault_mode` and from 14.94 to 12.19 on `normal`; those replays use the FD003 test engines, so they are not an independent proof either. A second run of the flow trained an identical challenger (same data, same seed): improvement 0.0 %, champion kept. The drift reference stays the FD001 period: after a promotion, the FD003 engines still look drifted.
 
 The flow replaces `models/champion/` without DVC, so `dvc status` then reports it as modified, and two tests that compare the served model with the pipeline's evaluation are skipped. To go back to the pipeline's champion:
 
@@ -247,7 +261,7 @@ The flow replaces `models/champion/` without DVC, so `dvc status` then reports i
 dvc checkout models/champion --force
 ```
 
-and move the alias back in MLflow (`MlflowClient().set_registered_model_alias("turbofan-rul", "champion", "5")`). The API loads the champion at start-up: restart it after a promotion.
+and move the alias back in MLflow (`MlflowClient().set_registered_model_alias("turbofan-rul", "champion", "8")`). The API loads the champion at start-up: restart it after a promotion.
 ## The other subsets: FD002, FD003, FD004
 
 The pipeline is built on FD001: one fault mode, one flight regime. The same chain, with the same settings, was run on the three other subsets as DVC experiments. Each runs the chain up to `evaluate` in a temporary copy of the project, so the workspace (and the FD001 champion) is not touched:
@@ -265,17 +279,22 @@ python -m pipeline.collect_subsets
 
 FD002 and FD004 fly at six regimes (altitude, speed, throttle). The sensors jump from one level to another with the regime, far more than they move with wear. `regimes.normalize=true` scales each sensor within its regime (`turbofan/regimes.py`); the Data explorer page shows a sensor before and after.
 
-Test RMSE at the last cycle of each test engine:
+Test RMSE at the last cycle of each test engine, with the true remaining life capped at 125 (see Evaluation); in brackets, against the true value, not capped:
 
 | Subset | Engines (train / test) | Ridge | Random forest | XGBoost | LSTM | CNN |
 |---|---|---|---|---|---|---|
-| FD001 (the pipeline) | 70 / 100 | 17.45 | 17.14 | 16.13 | 14.85 | 20.73 |
-| FD002, one scaling for all regimes | 230 / 259 | 20.78 | 18.04 | 18.48 | 15.00 | 24.75 |
-| FD002, scaled within regimes | 230 / 259 | 19.31 | 17.06 | 16.07 | 13.00 | 19.33 |
-| FD003 | 70 / 100 | 18.57 | 18.75 | 17.98 | 13.69 | 20.06 |
-| FD004, scaled within regimes | 219 / 248 | 22.50 | 19.49 | 18.36 | 13.40 | 22.12 |
+| FD001 (the pipeline) | 70 / 100 | 17.45 (18.70) | 17.14 (18.25) | 16.13 (17.24) | 14.85 (16.09) | 18.45 (19.41) |
+| FD002, one scaling for all regimes | 182 / 259 | 20.72 (32.85) | 18.07 (29.86) | 18.53 (30.53) | 15.45 (26.68) | 24.14 (35.49) |
+| FD002, scaled within regimes | 182 / 259 | 19.23 (31.40) | 17.61 (29.83) | 16.60 (29.02) | 13.56 (24.92) | 21.03 (32.92) |
+| FD003 | 70 / 100 | 18.57 (20.03) | 18.75 (19.94) | 17.98 (19.13) | 13.69 (14.89) | 22.12 (23.24) |
+| FD004, scaled within regimes | 175 / 248 | 22.02 (32.90) | 19.21 (30.17) | 18.26 (29.54) | 13.65 (26.62) | 20.85 (31.58) |
 
-The constant baseline is between 42 and 46 everywhere. Scaling within regimes lowers every model's RMSE on FD002 (the LSTM from 15.00 to 13.00). These scores are better than the 20 to 30 we expected for FD002 and FD004, for every model, not only the LSTM; they have not been compared with published results. The training engines are counted after setting aside 15 validation and 15 calibration engines.
+The constant baseline is between 42 and 46 everywhere (43 to 55 uncapped). Scaling within regimes lowers every model's RMSE on FD002 (the LSTM from 15.45 to 13.56). Validation and calibration are 15 % of the engines of each subset: 15 and 15 for FD001 and FD003, 39 and 39 for FD002, 37 and 37 for FD004.
+
+The capped scores look better than the 20 to 30 we expected for FD002 and FD004. They are not a leak (an audit checked the split, the scaling, the features and the targets): many test engines of FD002 and FD004 are still far from failure (57 of 259 and 67 of 248 have more than 125 cycles left), and the cap counts a prediction of 125 as exact for them. Against the true value, the LSTM is at about 25 on both. They have not been compared with published results, whose way of counting would have to be checked first.
+
+The CNN settings were chosen on the FD001 validation engines; on FD003 the smaller CNN is worse than the previous one (22.12 against 20.06).
+
 ## Reproducible pipeline
 
 The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register` and `explain`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:

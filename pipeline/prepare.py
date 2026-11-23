@@ -22,8 +22,11 @@ def split_by_subset(train_all: pd.DataFrame, subsets: list[str], split: dict) ->
     """Split the engines of each subset on its own (70/15/15 for 100 engines), then gather them."""
     units = {"train": [], "val": [], "calib": []}
     for position in range(len(subsets)):
-        ids = train_all["unit_id"][train_all["unit_id"] // UNIT_OFFSET == position]
-        own = split_units(ids.unique().tolist(), split["n_val"], split["n_calib"], split["seed"])
+        ids = train_all["unit_id"][train_all["unit_id"] // UNIT_OFFSET == position].unique()
+        # a share, not a fixed number: a subset of 260 engines keeps 39 for validation, not 15
+        n_val = round(len(ids) * split["val_share"])
+        n_calib = round(len(ids) * split["calib_share"])
+        own = split_units(ids.tolist(), n_val, n_calib, split["seed"])
         for name in units:
             units[name] += own[name]
     return {name: train_all[train_all["unit_id"].isin(ids)] for name, ids in units.items()}

@@ -34,6 +34,7 @@ def summary(name: str, data: dict) -> dict:
             model: {
                 "val_rmse": val[model]["rmse"],
                 "test_rmse": test[model]["rmse"],
+                "test_rmse_uncapped": test[model]["rmse_uncapped"],
                 "test_mae": test[model]["mae"],
                 "test_nasa_score": test[model]["nasa_score"],
                 "coverage": test[model]["coverage"],
@@ -68,7 +69,8 @@ def main() -> None:
         lstm = run["models"]["lstm"]
         print(
             f"{run['name']:<15} {run['subset']} regimes={run['normalize_by_regime']!s:<5} "
-            f"lstm test rmse {lstm['test_rmse']:.2f}"
+            f"lstm test rmse {lstm['test_rmse']:.2f} "
+            f"(uncapped truth {lstm['test_rmse_uncapped']:.2f})"
         )
     print(f"wrote {path}")
 

@@ -9,6 +9,7 @@
     "tn": 75,
     "precision": 0.0,
     "recall": 0.0,
+    "rmse_uncapped": 43.39585044310255,
     "conformal_q": 69.0232090152938,
     "coverage": 0.88
   },
@@ -22,6 +23,7 @@
     "tn": 75,
     "precision": 1.0,
     "recall": 0.52,
+    "rmse_uncapped": 18.703049995879606,
     "conformal_q": 31.62442991275975,
     "coverage": 0.95
   },
@@ -35,6 +37,7 @@
     "tn": 74,
     "precision": 0.9444444444444444,
     "recall": 0.68,
+    "rmse_uncapped": 18.249887586091372,
     "conformal_q": 32.98475329255115,
     "coverage": 0.95
   },
@@ -48,6 +51,7 @@
     "tn": 74,
     "precision": 0.9523809523809523,
     "recall": 0.8,
+    "rmse_uncapped": 17.243017948369015,
     "conformal_q": 29.48340606689453,
     "coverage": 0.91
   },
@@ -61,20 +65,22 @@
     "tn": 73,
     "precision": 0.9090909090909091,
     "recall": 0.8,
+    "rmse_uncapped": 16.093088817008887,
     "conformal_q": 27.918113708496094,
     "coverage": 0.91
   },
   "cnn": {
-    "rmse": 20.728653633297245,
-    "mae": 16.437431979179383,
-    "nasa_score": 1359.869385572745,
-    "tp": 15,
+    "rmse": 18.446947722623257,
+    "mae": 14.86965989112854,
+    "nasa_score": 638.3152081687297,
+    "tp": 17,
     "fp": 2,
-    "fn": 10,
+    "fn": 8,
     "tn": 73,
-    "precision": 0.8823529411764706,
-    "recall": 0.6,
-    "conformal_q": 40.11259460449219,
-    "coverage": 0.95
+    "precision": 0.8947368421052632,
+    "recall": 0.68,
+    "rmse_uncapped": 19.40756740811761,
+    "conformal_q": 30.86383056640625,
+    "coverage": 0.88
   }
 }

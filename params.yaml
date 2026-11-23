@@ -13,8 +13,9 @@ regimes:
 
 split:
   seed: 42
-  n_val: 15
-  n_calib: 15
+  # shares of the engines of each subset: 15 and 15 of FD001's 100, 39 and 39 of FD002's 260
+  val_share: 0.15
+  calib_share: 0.15
 
 features:
   rolling_window: 30
@@ -26,6 +27,8 @@ alert:
   threshold: 30
 
 random_forest:
+  # kept after python -m pipeline.grid random_forest: shallower trees or bigger leaves narrow the
+  # gap between train and validation, but raise the validation RMSE (17.82 -> 18.06 to 19.51)
   n_estimators: 200
   max_depth: 12
   min_samples_leaf: 5
@@ -56,8 +59,11 @@ training:
   patience: 8
 
 cnn:
-  channels: [32, 64, 64]
+  # chosen on validation (python -m pipeline.grid cnn): fewer filters, val RMSE 22.65 -> 16.52;
+  # dropout 0.3 made it worse with either size
+  channels: [16, 32, 32]
   kernel_size: 5
+  dropout: 0.0
 
 conformal:
   coverage: 0.90
@@ -80,7 +86,8 @@ monitoring:
   error_window: 2000  # predictions in the rolling RMSE, about 15 engines
 
 retraining:
-  # phase 14: the challenger is trained on FD001 + extra_subset, then compared on both test sets
+  # phase 14: the challenger is trained on FD001 + extra_subset, then compared with the champion
+  # on the validation engines of both subsets (the test engines are only reported)
   extra_subset: FD003
-  min_improvement: 0.02  # RMSE on all test engines lowered by at least 2 %
-  max_degradation: 0.10  # RMSE on FD001 raised by less than 10 %
+  min_improvement: 0.02  # RMSE on all validation engines lowered by at least 2 %
+  max_degradation: 0.10  # RMSE on the FD001 validation engines raised by less than 10 %
