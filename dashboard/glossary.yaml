@@ -153,3 +153,10 @@ Retraining:
     meaning: Running a failed task again after a short wait. check_drift is retried twice, in case the log is still being written.
   - term: Alias (MLflow)
     meaning: A movable label on a registered version. Promoting a challenger moves the champion alias to its version.
+Other subsets:
+  - term: Flight regime
+    meaning: One of the six combinations of altitude, speed and throttle at which the engines of FD002 and FD004 fly. Each regime moves every sensor to another level.
+  - term: Scaling within regimes
+    meaning: A mean and a spread per sensor and per regime, learnt on the training engines, so that a change of regime is not mistaken for wear.
+  - term: DVC experiment
+    meaning: The same pipeline run with other parameters (dvc exp run -S data.subset=FD002), kept by DVC with its scores; dvc exp show compares them.

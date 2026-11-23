@@ -1,7 +1,8 @@
 """Add the target, split engines, scale sensors and write the processed tables.
 
 The DVC stage prepares params data.subset (FD001). The retraining flow of phase 14 calls
-prepare() with FD001 + FD003 and its own output folders.
+prepare() with FD001 + FD003 and its own output folders. With regimes.normalize (FD002, FD004,
+phase 15), each sensor is scaled within its flight regime.
 """
 
 import json
@@ -13,6 +14,7 @@ import pandas as pd
 from turbofan.config import INDEX_COLUMNS, MODELS_DIR, PROCESSED_DIR, REPORTS_DIR, load_params
 from turbofan.labels import add_rul, add_test_rul
 from turbofan.preprocessing import fit_scaler, scale_sensors, split_units
+from turbofan.regimes import fit_regime_scalers, scale_by_regime
 from turbofan.subsets import UNIT_OFFSET, load_subsets, load_subsets_test_rul
 
 
@@ -42,8 +44,13 @@ def prepare(
     parts = split_by_subset(train_all, subsets, params["split"])
     parts["test"] = test
 
-    # the scaler only sees the training engines
-    scaler = fit_scaler(parts["train"], sensors)
+    # the scaler only sees the training engines; with six flight regimes (FD002, FD004), one
+    # scaler per regime, so that a change of regime is not mistaken for wear
+    by_regime = params["regimes"]["normalize"]
+    if by_regime:
+        scaler = fit_regime_scalers(parts["train"], sensors)
+    else:
+        scaler = fit_scaler(parts["train"], sensors)
 
     processed_dir.mkdir(parents=True, exist_ok=True)
     report = {"subset": name, "rul_cap": cap, "sensors": sensors, "parts": {}}
@@ -51,7 +58,8 @@ def prepare(
         columns = INDEX_COLUMNS + sensors + ["rul", "rul_clipped"]
         if part == "test":
             columns = columns + ["final_rul"]
-        scaled = scale_sensors(df, scaler, sensors)[columns]
+        scale = scale_by_regime if by_regime else scale_sensors
+        scaled = scale(df, scaler, sensors)[columns]
         scaled.to_parquet(processed_dir / f"{part}.parquet", index=False)
         report["parts"][part] = {
             "n_engines": int(df["unit_id"].nunique()),

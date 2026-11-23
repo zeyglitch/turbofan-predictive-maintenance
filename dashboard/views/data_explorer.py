@@ -1,11 +1,13 @@
 """Data explorer: the raw NASA files, from the whole fleet down to one engine."""
 
+import pandas as pd
 import plotly.express as px
 import streamlit as st
 
 from dashboard import loaders
 from turbofan.config import SENSOR_COLUMNS
 from turbofan.describe import engine_lifetimes, sensor_summary
+from turbofan.regimes import fit_regime_scalers, regime_of, scale_by_regime
 
 st.title("Data explorer")
 st.caption(
@@ -19,8 +21,9 @@ subset = st.segmented_control(
 )
 if subset != "FD001":
     st.caption(
-        f"The models use FD001 only. {subset} is shown for comparison: the kept sensors below "
-        "are those chosen on FD001."
+        f"The pipeline is built on FD001; {subset} was run through the same chain for "
+        "comparison (scores on the Models page). The kept sensors below are those chosen on "
+        "FD001."
     )
 loaders.require([loaders.path("data", "raw", f"train_{subset}.txt")], "python -m pipeline.download")
 train = loaders.read_raw(subset, "train")
@@ -102,3 +105,43 @@ st.plotly_chart(figure, alt=f"The 21 sensors of engine {unit_id} over its life")
 
 with st.expander("Raw rows of this engine"):
     st.dataframe(engine, hide_index=True)
+
+st.subheader("Flight regimes")
+regimes = regime_of(train)
+st.caption(
+    f"{subset} flies at {regimes.nunique()} regime{'s' if regimes.nunique() > 1 else ''}: the "
+    "three settings (altitude, speed, throttle), rounded, take that many combinations."
+    + (
+        " Each regime moves every sensor to another level, far more than wear does. Scaling "
+        "each sensor within its own regime (mean and spread learnt on the training rows of that "
+        "regime) removes the jumps and leaves the wear visible."
+        if regimes.nunique() > 1
+        else " One regime: nothing hides the wear, a single scaling per sensor is enough."
+    )
+)
+if regimes.nunique() > 1:
+    sensor = st.selectbox("Sensor", kept, index=kept.index("s_11"), key="regime_sensor")
+    # scalers learnt on the whole training file, applied to this engine
+    scaled = scale_by_regime(engine, fit_regime_scalers(train, [sensor]), [sensor])
+    before_after = pd.concat(
+        [
+            pd.DataFrame({"cycle": engine["cycle"], "value": engine[sensor], "view": "raw value"}),
+            pd.DataFrame(
+                {
+                    "cycle": engine["cycle"],
+                    "value": scaled[sensor],
+                    "view": "scaled within its regime",
+                }
+            ),
+        ]
+    )
+    figure = px.line(before_after, x="cycle", y="value", facet_row="view", height=500, markers=True)
+    figure.update_traces(line={"width": 1}, marker={"size": 3})
+    figure.update_yaxes(matches=None, title=None)
+    figure.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    st.plotly_chart(figure, alt=f"{sensor} of engine {unit_id}, raw and scaled within regimes")
+    st.caption(
+        f"Engine {unit_id}, {sensor}. Top: the raw value jumps between the regimes at every "
+        "flight. Bottom: within its regime, each value becomes a number of standard deviations "
+        "from that regime's mean, and the slow rise of wear appears."
+    )

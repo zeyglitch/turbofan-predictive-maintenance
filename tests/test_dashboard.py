@@ -346,3 +346,31 @@ def test_overview_warns_when_retraining_replaced_the_champion(toy_root, monkeypa
     write_json(toy_root / "models" / "champion" / "metadata.json", served)
     warning = open_page(PAGES[0]).warning[0].value
     assert "promoted version 2 (LSTM, trained on FD001 + FD003)" in warning
+
+
+def test_models_page_compares_the_subsets(toy_root, monkeypatch):
+    def run(name, subset, by_regime, lstm_rmse):
+        models = ["baseline", "ridge", "random_forest", "xgboost", "lstm", "cnn"]
+        scores = {"val_rmse": 20.0, "test_rmse": 25.0, "test_mae": 18.0}
+        scores |= {"test_nasa_score": 900.0, "coverage": 0.9}
+        return {
+            "name": name,
+            "subset": subset,
+            "normalize_by_regime": by_regime,
+            "n_train_engines": 70,
+            "n_test_engines": 100,
+            "models": {
+                m: scores | ({"test_rmse": lstm_rmse} if m == "lstm" else {}) for m in models
+            },
+        }
+
+    runs = [run("pipeline", "FD001", False, 15.0), run("fd002-regimes", "FD002", True, 28.0)]
+    write_json(toy_root / "reports" / "subsets.json", runs)
+    monkeypatch.setenv("DASHBOARD_ROOT", str(toy_root))
+    app = open_page(PAGES[3])
+    assert not app.exception
+    chooser = app.segmented_control[0]
+    assert chooser.value == "pipeline"
+    chooser.set_value("fd002-regimes").run()
+    table = app.dataframe[0].value
+    assert table.set_index("model").loc["lstm", "test_rmse"] == 28.0

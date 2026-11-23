@@ -33,8 +33,8 @@ stages:
       nfiles: 13
     - path: pipeline/prepare.py
       hash: md5
-      md5: 79113f7d320f1c0d74671ddc18b04753
-      size: 3379
+      md5: c84bd08e8b100ef3613cdd0724effde1
+      size: 3859
     - path: turbofan/config.py
       hash: md5
       md5: da0955c3eaeafed6e3628ca38b4fafc7
@@ -51,6 +51,10 @@ stages:
       hash: md5
       md5: dabb3052076422a3503b313733ff4d9a
       size: 1488
+    - path: turbofan/regimes.py
+      hash: md5
+      md5: a224b4d6ff4d33d4971f6d961988c813
+      size: 1885
     - path: turbofan/subsets.py
       hash: md5
       md5: 24cb4988d65b7f46477ea459e94e386b
@@ -75,6 +79,8 @@ stages:
           - s_17
           - s_20
           - s_21
+        regimes:
+          normalize: false
         split:
           seed: 42
           n_val: 15

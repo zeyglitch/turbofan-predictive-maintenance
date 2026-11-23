@@ -18,11 +18,13 @@ stages:
       - turbofan/data.py
       - turbofan/labels.py
       - turbofan/preprocessing.py
+      - turbofan/regimes.py
       - turbofan/subsets.py
       - data/raw
     params:
       - data.subset
       - prepare
+      - regimes
       - split
     outs:
       - data/processed

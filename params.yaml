@@ -7,6 +7,10 @@ prepare:
   rul_cap: 125
   sensors: [s_2, s_3, s_4, s_7, s_8, s_9, s_11, s_12, s_13, s_14, s_15, s_17, s_20, s_21]
 
+regimes:
+  # phase 15: FD002 and FD004 fly at six regimes; scale each sensor within its regime
+  normalize: false
+
 split:
   seed: 42
   n_val: 15

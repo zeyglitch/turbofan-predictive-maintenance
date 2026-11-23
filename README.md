@@ -248,6 +248,34 @@ dvc checkout models/champion --force
 ```
 
 and move the alias back in MLflow (`MlflowClient().set_registered_model_alias("turbofan-rul", "champion", "5")`). The API loads the champion at start-up: restart it after a promotion.
+## The other subsets: FD002, FD003, FD004
+
+The pipeline is built on FD001: one fault mode, one flight regime. The same chain, with the same settings, was run on the three other subsets as DVC experiments. Each runs the chain up to `evaluate` in a temporary copy of the project, so the workspace (and the FD001 champion) is not touched:
+
+```powershell
+dvc exp run --temp -n fd003 -S data.subset=FD003 evaluate
+dvc exp run --temp -n fd002-regimes -S data.subset=FD002 -S regimes.normalize=true evaluate
+dvc exp run --temp -n fd004-regimes -S data.subset=FD004 -S regimes.normalize=true evaluate
+dvc exp run --temp -n fd002-global -S data.subset=FD002 evaluate
+dvc exp show
+python -m pipeline.collect_subsets
+```
+
+`dvc exp show` lists each experiment with its parameters and scores; `collect_subsets` writes them to `reports/subsets.json`, which the Models page of the dashboard compares. With `--temp`, a new file must be added to git (`git add`) before the run, or the temporary copy does not include it.
+
+FD002 and FD004 fly at six regimes (altitude, speed, throttle). The sensors jump from one level to another with the regime, far more than they move with wear. `regimes.normalize=true` scales each sensor within its regime (`turbofan/regimes.py`); the Data explorer page shows a sensor before and after.
+
+Test RMSE at the last cycle of each test engine:
+
+| Subset | Engines (train / test) | Ridge | Random forest | XGBoost | LSTM | CNN |
+|---|---|---|---|---|---|---|
+| FD001 (the pipeline) | 70 / 100 | 17.45 | 17.14 | 16.13 | 14.85 | 20.73 |
+| FD002, one scaling for all regimes | 230 / 259 | 20.78 | 18.04 | 18.48 | 15.00 | 24.75 |
+| FD002, scaled within regimes | 230 / 259 | 19.31 | 17.06 | 16.07 | 13.00 | 19.33 |
+| FD003 | 70 / 100 | 18.57 | 18.75 | 17.98 | 13.69 | 20.06 |
+| FD004, scaled within regimes | 219 / 248 | 22.50 | 19.49 | 18.36 | 13.40 | 22.12 |
+
+The constant baseline is between 42 and 46 everywhere. Scaling within regimes lowers every model's RMSE on FD002 (the LSTM from 15.00 to 13.00). These scores are better than the 20 to 30 we expected for FD002 and FD004, for every model, not only the LSTM; they have not been compared with published results. The training engines are counted after setting aside 15 validation and 15 calibration engines.
 ## Reproducible pipeline
 
 The chain `download → prepare → featurize → train_classic`, with `train_deep` after `prepare`, then `evaluate → register` and `explain`, is declared in `dvc.yaml`. With the environment activated (the stages call `python`), one command rebuilds whatever is out of date:

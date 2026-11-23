@@ -15,6 +15,67 @@ st.caption(
     "are only used to report the final scores below, never to choose."
 )
 
+subsets_file = loaders.path("reports", "subsets.json")
+if subsets_file.exists():
+    st.subheader("Across the four subsets")
+    runs = loaders.read_json(subsets_file)
+    labels = {
+        run["name"]: f"{run['subset']}"
+        + (" (scaled within regimes)" if run["normalize_by_regime"] else "")
+        + (" — the pipeline" if run["name"] == "pipeline" else "")
+        for run in runs
+    }
+    st.caption(
+        "The same chain, with the same settings, run on each subset (DVC experiments, collected "
+        "by `python -m pipeline.collect_subsets`). FD002 and FD004 fly at six regimes and are "
+        "scaled within each regime; FD003 and FD004 have two fault modes. Test RMSE at the last "
+        "cycle of each test engine; the champion of each subset would be chosen on validation."
+    )
+    comparison = pd.DataFrame(
+        [
+            {"run": labels[run["name"]], "model": model, "test RMSE": scores["test_rmse"]}
+            for run in runs
+            for model, scores in run["models"].items()
+            if model != "baseline"  # around 40 cycles everywhere, it would flatten the chart
+        ]
+    )
+    st.plotly_chart(
+        px.bar(
+            comparison,
+            x="model",
+            y="test RMSE",
+            color="run",
+            barmode="group",
+            # five clearly different colours: the theme's default gives two close blues
+            color_discrete_sequence=["#1f77b4", "#ff7f0e", "#d62728", "#2ca02c", "#9467bd"],
+        ),
+        alt="Test RMSE of each model on each subset",
+    )
+    chosen = st.segmented_control(
+        "Scores of one run",
+        list(labels),
+        format_func=labels.get,
+        default="pipeline",
+        required=True,
+    )
+    run = next(run for run in runs if run["name"] == chosen)
+    st.caption(
+        f"{run['n_train_engines']} engines to train, validation and calibration engines apart, "
+        f"{run['n_test_engines']} test engines."
+    )
+    st.dataframe(
+        pd.DataFrame(run["models"]).T.rename_axis("model").reset_index(),
+        hide_index=True,
+        column_config={
+            "val_rmse": st.column_config.NumberColumn("val RMSE", format="%.1f"),
+            "test_rmse": st.column_config.NumberColumn("test RMSE", format="%.1f"),
+            "test_mae": st.column_config.NumberColumn("test MAE", format="%.1f"),
+            "test_nasa_score": st.column_config.NumberColumn("test NASA score", format="%.0f"),
+            "coverage": st.column_config.NumberColumn("interval coverage", format="%.2f"),
+        },
+    )
+    st.caption("Everything below is the pipeline on FD001.")
+
 val_classic_file = loaders.path("reports", "metrics", "val_classic.json")
 val_deep_file = loaders.path("reports", "metrics", "val_deep.json")
 test_file = loaders.path("reports", "metrics", "test.json")
