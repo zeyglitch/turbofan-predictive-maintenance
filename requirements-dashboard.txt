@@ -7,3 +7,5 @@ streamlit==1.67.0
 plotly==7.1.0
 httpx==0.28.1
 scipy==1.18.1
+# the scalers by flight regime of the Data explorer page (turbofan/regimes.py)
+scikit-learn==1.9.1

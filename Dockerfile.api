@@ -1,4 +1,4 @@
-# The prediction API of phase 10: FastAPI and the champion model, processor-only torch.
+# The prediction API: FastAPI and the champion model, processor-only torch.
 FROM python:3.13-slim
 
 # no .pyc files in the image, and logs printed at once instead of being buffered

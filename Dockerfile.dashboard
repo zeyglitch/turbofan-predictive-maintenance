@@ -1,4 +1,4 @@
-# The Streamlit dashboard of phase 11. No torch: it reads files and asks the API for predictions.
+# The Streamlit dashboard. No torch: it reads files and asks the API for predictions.
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
